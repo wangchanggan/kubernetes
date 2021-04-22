@@ -18,4 +18,4 @@ Source Code From https://github.com/kubernetes/kubernetes/releases/tag/v1.21.0
 | third party/ | 存放第三方工具、代码或其他组件 |
 | plugin/ | 存放Kubernetes插件代码目录，例如认证、授权等相关插件 |
 | staging/ | 存放部分核心库的暂存目录 |
-| translations | 存放il8n(国际化）语言包的相关文件,可以在不修改内部代码的情况下支持不同语言及地区 |
+| translations/ | 存放il8n(国际化）语言包的相关文件,可以在不修改内部代码的情况下支持不同语言及地区 |
