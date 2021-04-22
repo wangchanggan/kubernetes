@@ -1,87 +1,21 @@
-# Kubernetes (K8s)
+# Kubernetes (K8s)源码分析
 
-[![GoPkg Widget]][GoPkg] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
+Source Code From https://github.com/kubernetes/kubernetes/releases/tag/v1.21.0
 
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
+参考Kubernetes源码分析（基于Kubernetes 1.14版本）（郑东旭/著）
 
-----
-
-Kubernetes, also known as K8s, is an open source system for managing [containerized applications]
-across multiple hosts. It provides basic mechanisms for deployment, maintenance,
-and scaling of applications.
-
-Kubernetes builds upon a decade and a half of experience at Google running
-production workloads at scale using a system called [Borg],
-combined with best-of-breed ideas and practices from the community.
-
-Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
-If your company wants to help shape the evolution of
-technologies that are container-packaged, dynamically scheduled,
-and microservices-oriented, consider joining the CNCF.
-For details about who's involved and how Kubernetes plays a role,
-read the CNCF [announcement].
-
-----
-
-## To start using K8s
-
-See our documentation on [kubernetes.io].
-
-Try our [interactive tutorial].
-
-Take a free course on [Scalable Microservices with Kubernetes].
-
-To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
-Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
-
-## To start developing K8s
-
-The [community repository] hosts all information about
-building Kubernetes from source, how to contribute code
-and documentation, who to contact about what, etc.
-
-If you want to build Kubernetes right away there are two options:
-
-##### You have a working [Go environment].
-
-```
-mkdir -p $GOPATH/src/k8s.io
-cd $GOPATH/src/k8s.io
-git clone https://github.com/kubernetes/kubernetes
-cd kubernetes
-make
-```
-
-##### You have a working [Docker environment].
-
-```
-git clone https://github.com/kubernetes/kubernetes
-cd kubernetes
-make quick-release
-```
-
-For the full story, head over to the [developer's documentation].
-
-## Support
-
-If you need support, start with the [troubleshooting guide],
-and work your way through the process that we've outlined.
-
-That said, if you have questions, reach out to us
-[one way or another][communication].
-
-[announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
-[Borg]: https://research.google.com/pubs/pub43438.html
-[CNCF]: https://www.cncf.io/about
-[communication]: https://git.k8s.io/community/communication
-[community repository]: https://git.k8s.io/community
-[containerized applications]: https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/
-[developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
-[Docker environment]: https://docs.docker.com/engine
-[Go environment]: https://golang.org/doc/install
-[GoPkg]: https://pkg.go.dev/k8s.io/kubernetes
-[GoPkg Widget]: https://pkg.go.dev/badge/k8s.io/kubernetes.svg
-[interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
-[kubernetes.io]: https://kubernetes.io
-[Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
+##源码目录结构说明
+| 源码目录 | 说明 |
+| :----: | :---- |
+| cmd/ | 存放可执行文件的入口代码,每个可执行文件都会对应一个 main函数 |
+| pkg/ | 存放核心库代码,可被项目内部或外部直接引用 |
+| vendor/ | 存放项目依赖的库代码,一般为第三方库代码 |
+| api/ | 存放 OpenAPI/Swagger 的spec文件,包括JSON、Protocol的定义等 |
+| build/ | 存放与构建相关的脚本 |
+| test/ | 存放测试工具及测试数据 |
+| docs/ | 存放设计或用户使用文档 |
+| hack/ | 存放与构建、测试等相关的脚本 |
+| third party/ | 存放第三方工具、代码或其他组件 |
+| plugin/ | 存放Kubernetes插件代码目录，例如认证、授权等相关插件 |
+| staging/ | 存放部分核心库的暂存目录 |
+| translations | 存放il8n(国际化）语言包的相关文件,可以在不修改内部代码的情况下支持不同语言及地区 |
