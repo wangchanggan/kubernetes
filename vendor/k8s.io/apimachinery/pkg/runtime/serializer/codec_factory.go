@@ -48,6 +48,7 @@ type serializerType struct {
 	StreamSerializer runtime.Serializer
 }
 
+// Codec编解码器通过 NewCodecFactory函数实例化，在实例化的过程中会将jsonSerializer、yamlSerializer、protobufSerializer序列化器全部实例化。
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, options CodecFactoryOptions) []serializerType {
 	jsonSerializer := json.NewSerializerWithOptions(
 		mf, scheme, scheme,

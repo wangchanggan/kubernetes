@@ -46,18 +46,22 @@ import (
 type Scheme struct {
 	// versionMap allows one to figure out the go type of an object with
 	// the given version and name.
+	// 存储GVK与Type的映射关系。
 	gvkToType map[schema.GroupVersionKind]reflect.Type
 
 	// typeToGroupVersion allows one to find metadata for a given go object.
 	// The reflect.Type we index by should *not* be a pointer.
+	// 存储Type与GVK的映射关系，一个Type会对应一个或多个GVK。
 	typeToGVK map[reflect.Type][]schema.GroupVersionKind
 
 	// unversionedTypes are transformed without conversion in ConvertToVersion.
+	// 存储UnversionedType与GVK的映射关系。
 	unversionedTypes map[reflect.Type]schema.GroupVersionKind
 
 	// unversionedKinds are the names of kinds that can be created in the context of any group
 	// or version
 	// TODO: resolve the status of unversioned types.
+	// 存储Kind（资源种类）名称与UnversionedType的映射关系。
 	unversionedKinds map[string]reflect.Type
 
 	// Map from version and resource to the corresponding func to convert
@@ -162,6 +166,7 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 func (s *Scheme) AddKnownTypes(gv schema.GroupVersion, types ...Object) {
 	s.addObservedVersion(gv)
 	for _, obj := range types {
+		// 在注册资源类型时，无须指定Kind名称，而是通过reflet机制获取资源类型的名称作为资源种类名称。
 		t := reflect.TypeOf(obj)
 		if t.Kind() != reflect.Ptr {
 			panic("All types must be pointers to structs.")
@@ -328,6 +333,7 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 // AddIgnoredConversionType identifies a pair of types that should be skipped by
 // conversion (because the data inside them is explicitly dropped during
 // conversion).
+// 注册忽略的资源类型，不会执行转换操作，忽略资源对象的转换操作。
 func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
 	return s.converter.RegisterIgnoredConversion(from, to)
 }
@@ -335,6 +341,7 @@ func (s *Scheme) AddIgnoredConversionType(from, to interface{}) error {
 // AddConversionFunc registers a function that converts between a and b by passing objects of those
 // types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
 // any other guarantee.
+// 注册单个Conversion Func转换函数。
 func (s *Scheme) AddConversionFunc(a, b interface{}, fn conversion.ConversionFunc) error {
 	return s.converter.RegisterUntypedConversionFunc(a, b, fn)
 }
@@ -342,12 +349,14 @@ func (s *Scheme) AddConversionFunc(a, b interface{}, fn conversion.ConversionFun
 // AddGeneratedConversionFunc registers a function that converts between a and b by passing objects of those
 // types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
 // any other guarantee.
+// 注册自动生成的转换函数。
 func (s *Scheme) AddGeneratedConversionFunc(a, b interface{}, fn conversion.ConversionFunc) error {
 	return s.converter.RegisterGeneratedUntypedConversionFunc(a, b, fn)
 }
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
+// 注册字段标签(FieldLabel) 的转换函数。
 func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conversionFunc FieldLabelConversionFunc) error {
 	s.fieldLabelConversionFuncs[gvk] = conversionFunc
 	return nil
@@ -358,6 +367,7 @@ func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conver
 // when Default() is called. The function will never be called unless the
 // defaulted object matches srcType. If this function is invoked twice with the
 // same srcType, the fn passed to the later call will be used instead.
+// 注册默认字段的转换函数
 func (s *Scheme) AddTypeDefaultingFunc(srcType Object, fn func(interface{})) {
 	s.defaulterFuncs[reflect.TypeOf(srcType)] = fn
 }
@@ -479,6 +489,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 
 		in = typed
 		// unstructuredToTyped returns an Object, which must be a pointer to a struct.
+		// 资源版本转换的类型可以是 runtime.Object或 runtime.Unstructured，它们都属于Go语言里的Struct数据结构，
+		// 通过Go语言标准库reflect机制获取该资源类型的反射类型，因为在Scheme资源注册表中是以反射类型注册资源的。
+		// 获取传入的资反射类型
 		t = reflect.TypeOf(in).Elem()
 
 	} else {
@@ -493,11 +506,13 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		}
 	}
 
+	// 从Scheme资源注册表中查找到传入的资源对象的所有GVK，验证传入的资源对象是否已经注册，如果未曾注册，则返回错误
 	kinds, ok := s.typeToGVK[t]
 	if !ok || len(kinds) == 0 {
 		return nil, NewNotRegisteredErrForType(s.schemeName, t)
 	}
 
+	// target.KindForGroupVersionKinds函数从多个可转换的GVK中选出与目标资源对象相匹配的GVK
 	gvk, ok := target.KindForGroupVersionKinds(kinds)
 	if !ok {
 		// try to see if this type is listed as unversioned (for legacy support)
@@ -519,6 +534,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	}
 
 	// type is unversioned, no conversion necessary
+	// 属于该Unversioned类型（即无版本类型）的资源对象并不需要进行转换操作，而是直接将传入的资源对象的GVK设置为目标资源对象的GVK。
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
 		if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
 			return copyAndSetTargetKind(copy, in, gvk)
@@ -531,16 +547,19 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, err
 	}
 
+	// 在执行转换操作之前，先判断是否需要对传入的资源对象执行深复制操作
 	if copy {
 		in = in.DeepCopyObject()
 	}
 
 	meta := s.generateConvertMeta(in)
 	meta.Context = target
+	// 通过s.converter.Convert转换函数执行转换操作
 	if err := s.converter.Convert(in, out, meta); err != nil {
 		return nil, err
 	}
 
+	// 设置转换后资源对象的GVK
 	setTargetKind(out, gvk)
 	return out, nil
 }
@@ -580,6 +599,7 @@ func copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVersionKind) (
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.
 func setTargetKind(obj Object, kind schema.GroupVersionKind) {
+	// 判断当前资源对象是否为内部版本(即APIVersionInternal),是内部版本则设置GVK为schema.GroupVersionKind{}。
 	if kind.Version == APIVersionInternal {
 		// internal is a special case
 		// TODO: look at removing the need to special case this

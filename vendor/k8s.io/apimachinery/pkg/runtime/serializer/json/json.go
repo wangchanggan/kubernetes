@@ -208,7 +208,11 @@ func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVer
 // The gvk calculate priority will be originalData > default gvk > into
 func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	data := originalData
+	//
+	//接着通过s.meta Itepret函数
 	if s.options.Yaml {
+		// 如果是YAML格式，则通过yaml.YAMLToJSON函数将JSON格式数据转换为资源对象并填充到data字段中
+		// 此时，无论反序列化操作的是YAML格式还是JSON格式，data字段中都是JSON格式数据。
 		altered, err := yaml.YAMLToJSON(data)
 		if err != nil {
 			return nil, nil, err
@@ -216,7 +220,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		data = altered
 	}
 
-	actual, err := s.meta.Interpret(data)
+	actual, err := s.meta.Interpret(data) // 从JSON格式数据中提取出资源对象的metav1.TypeMeta(即APIVersion和Kind字段)。
 	if err != nil {
 		return nil, nil, err
 	}
@@ -286,6 +290,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	// due to that a matching field doesn't exist in the object. hence we can return a typed strictDecoderError,
 	// the actual error is that the object contains unknown field.
 	strictObj := obj.DeepCopyObject()
+	//最后通过strictCaseSensitiveJSONIterator.Unmarshal函数(即json-iterator)将JSON数据反序列化并返回。
 	if err := strictCaseSensitiveJSONIterator.Unmarshal(altered, strictObj); err != nil {
 		return nil, actual, runtime.NewStrictDecodingError(err.Error(), string(originalData))
 	}
@@ -302,12 +307,19 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 }
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
-	if s.options.Yaml {
+	// jsonSerializer与yamlSerializer序列化器共享同一个数据结构，通过yaml字段区分。
+	if s.options.Yaml { // 如果是YAML格式
+		// 将资源对象转换为JSON格式
+		// Kubernetes在jsonSerializer序列化器上做了一些优化，caseSensitiveJSONIterator函数实际封装了github.com/json-iterator/go 第三方库
+		// json-iterator 有如下几个好处：
+		// 1、json-iterator 支持区分大小写。Go语言标准库encoding/json 在默认情况下不区分大小写。
+		// 2、json-itrator 性能更优，编码可达到837ns/op，解码可达到5623ns/op.
+		// 3、json-iterator 100%兼容Go语言标准库encoding.json,可随时切换两种编解码方式
 		json, err := caseSensitiveJSONIterator.Marshal(obj)
 		if err != nil {
 			return err
 		}
-		data, err := yaml.JSONToYAML(json)
+		data, err := yaml.JSONToYAML(json) // 使用第三方库gopkg.in/yaml.v2来将JSON格式转换为YAML格式并返回数据
 		if err != nil {
 			return err
 		}
@@ -316,6 +328,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if s.options.Pretty {
+		// 如果pretty参数开启的话，caseSensitiveJSONIterator.MarshalIndent函数优化JSON格式。
 		data, err := caseSensitiveJSONIterator.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			return err
@@ -323,7 +336,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data)
 		return err
 	}
-	encoder := json.NewEncoder(w)
+	encoder := json.NewEncoder(w) //如果是JSON格式，则通过Go语言标准库的json.Encode函数将资源对象转换为JSON格式。
 	return encoder.Encode(obj)
 }
 

@@ -109,6 +109,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		return nil, nil, fmt.Errorf("empty body")
 	}
 
+	// 首先验证protoEncodingPrefix前缀，前缀为magic-number特殊标识，其用于标识一个包的完整性。
 	data := originalData[prefixLen:]
 	unk := runtime.Unknown{}
 	if err := unk.Unmarshal(data); err != nil {
@@ -212,9 +213,10 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data[:prefixSize+uint64(i)])
 		return err
 
+	// 首先验证资源对象是否为proto.Marshaler类型，proto.Marshaler是一个interface 接口类型，该接口专门留给对象自定义实现的序列化操作。
 	case proto.Marshaler:
 		// this path performs extra allocations
-		data, err := t.Marshal()
+		data, err := t.Marshal() // 通过t.Marshal序列化函数进行编码。
 		if err != nil {
 			return err
 		}
@@ -223,6 +225,9 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		estimatedSize := prefixSize + uint64(unk.Size())
 		data = make([]byte, estimatedSize)
 
+		// 通过unk.MarshalTo函数在编码后的数据前加上protoEncodingPrefix前缀，前缀为magic-number 特殊标识，其用于标识一个包的完整性。
+		// 所有通过protobufSerializer序列化器编码的数据都会有前缀。
+		// 前缀数据共4字节，分别是0x6b、0x38、0x73、 0x00，其中第4个字节是为编码样式保留的。
 		i, err := unk.MarshalTo(data[prefixSize:])
 		if err != nil {
 			return err
@@ -380,10 +385,12 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 		return nil, actual, err
 	}
 
+	// 然后验证资源对象是否为proto.Message类型
 	pb, ok := obj.(proto.Message)
 	if !ok {
 		return nil, actual, errNotMarshalable{reflect.TypeOf(obj)}
 	}
+	//最后通过proto.Unmarshal反序列化函数进行解码
 	if err := proto.Unmarshal(data, pb); err != nil {
 		return nil, actual, err
 	}

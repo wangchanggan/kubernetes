@@ -91,6 +91,8 @@ type Serializer interface {
 // Codec is a Serializer that deals with the details of versioning objects. It offers the same
 // interface as Serializer, so this is a marker to consumers that care about the version of the objects
 // they receive.
+// Serializer 序列化器属于Codec编解码器的一种，这是因为每种序列化器都实现了Encoder与Decoder方法。
+// 只要实现了Encoder 与 Decoder方法的数据结构，就是序列化器。
 type Codec Serializer
 
 // ParameterCodec defines methods for serializing and deserializing API objects to url.Values and
@@ -297,8 +299,8 @@ type SelfLinker interface {
 // serializers to set the kind, version, and group the object is represented as. An Object may choose
 // to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
 type Object interface {
-	GetObjectKind() schema.ObjectKind   //用于设置并返回 GroupVersionKind
-	DeepCopyObject() Object             //用于深复制当前资源对象并返回。
+	GetObjectKind() schema.ObjectKind //用于设置并返回 GroupVersionKind
+	DeepCopyObject() Object           //用于深复制当前资源对象并返回。
 	// 深复制相当于将教据结构克隆一份，因此它不与原始对象共享任何内容。它使代码在不修改原始对象的情况下可以改变克隆对象的任何属性。
 	// Kubernetes的每一个资源对象都嵌入了metav1.TypeMeta类型，metav1.TypeMeta类型实现了GetObiectKind方法,所以资源对象拥有该方法,
 	// 另外，Kubernetes的每 个资源对象都实现了DeepCopyObject方注，该方法一般被定义在zz_generated.deepcopy.go文件中。
@@ -328,6 +330,8 @@ type CacheableObject interface {
 
 // Unstructured objects store values as map[string]interface{}, with only values that can be serialized
 // to JSON allowed.
+// 非结构化数据通过map[string]interface{}表达，并提供接口。即每个字符串对应一个JSON属性，其映射interface{}类型对应值，可以是任何类型。
+// 在client-go编程式交互的DynamicClient内部，实现了Unstructured类型，用于处理非结构化数据。
 type Unstructured interface {
 	Object
 	// NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
