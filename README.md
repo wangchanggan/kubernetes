@@ -34,6 +34,7 @@ Source Code From https://github.com/kubernetes/kubernetes/releases/tag/v1.21.0
 
 ### APIResourceList
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/type.go:1077
+
 vendor/k8s.io/apimachinery/pkg/runtime/schema（资源数据结构）
 
 
@@ -49,9 +50,9 @@ vendor/k8s.io/apimachinery/pkg/apis/meta/v1/type.go:953
 vendor/k8s.io/apimachinery/pkg/apis/meta/v1/type.go:1032
 
 #### 资源外部版本与内部版本
-资源外部版本：vendor/k8s.io/api/<group>/<version>/<resource file>
+资源外部版本：vendor/k8s.io/api/\<group>/\<version>/\<resource file>
 
-资源内部版本：pkg/apis/<group>
+资源内部版本：pkg/apis/\<group>
 
 #### 资源代码定义
 ##### 资源内部版本
