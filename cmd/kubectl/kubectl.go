@@ -46,6 +46,9 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	// kubectl的main函数中定义了执行函数command.Execute，原理是对命令行中的所有参数解析出Command 和Flag，把Flag作为参数传递给Command 并执行。
+	//command.Execute -> ExecuteC，深入查看vendor/github.com/spf13/cobra/command.go
+	//args 数组中包含所有命令行参数，通过c.Find函数解析出cmd和flags, 然后通过cmd.execute执行命令中定义的Run执行函数。
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
 	}

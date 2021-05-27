@@ -185,6 +185,7 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 
 // VisitorList implements Visit for the sub visitors it contains. The first error
 // returned from a child Visitor will terminate iteration.
+// 当遍历执行Visitor时，如果遇到错误，则立刻返回。
 type VisitorList []Visitor
 
 // Visit implements Visitor
@@ -199,6 +200,7 @@ func (l VisitorList) Visit(fn VisitorFunc) error {
 
 // EagerVisitorList implements Visit for the sub visitors it contains. All errors
 // will be captured and returned at the end of iteration.
+// 当遍历执行Visitor时，如果遇到错误，则保留错误信息，继续遍历执行下一个Visitor。最后一起返回所有错误。
 type EagerVisitorList []Visitor
 
 // Visit implements Visitor, and gathers errors that occur during processing until

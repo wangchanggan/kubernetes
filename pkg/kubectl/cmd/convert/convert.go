@@ -116,6 +116,9 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 	if err != nil {
 		return err
 	}
+
+	// Builder用于将命令行获取的参数转换成资源对象（Resource Object）。它实现了一种通用的资源对象转换功能。
+	// Builder结构体保存了命令行获取的各种参数，并通过不同函数处理不同参数，将其转换成资源对象。
 	o.builder = f.NewBuilder
 
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -137,6 +140,9 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 
 // RunConvert implements the generic Convert command
 func (o *ConvertOptions) RunConvert() error {
+	// Builder的实现类似于Builder建造者设计模式，提供了一种实例化对象的最佳方式。
+	// 首先通过f.NewBuilder实例化Builder对象，通过函数 Unstructured、Schema、ContinueOnError、NamespaceParam、FilenameParam、LabelSelectorParam、Flatten
+	// 对参数赋值和初始化，将参数保存到 Builder 对象中。最后通过Do函数完成对资源的创建。
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
@@ -150,8 +156,15 @@ func (o *ConvertOptions) RunConvert() error {
 
 	r := b.NamespaceParam(o.Namespace).
 		ContinueOnError().
+		// FilenameParam函数用于识别kubectl create命令行参数是通过哪种方式传入资源对象描述文件的，kubectl目前支持3种方式：
+		// 第1种，标准输入Stdin（即cat deployment.yaml | kubectl create -f -);
+		// 第2种，本地文件（即kubectl create -f deployment.yaml）;
+		// 第3种，网络文件（即 kubectl create -f http://<host>/deployment.yaml）。
 		FilenameParam(false, &o.FilenameOptions).
 		Flatten().
+		// Do函数返回Result对象，Result对象的info字段保存了RESTClient与kube-apiserver交互产生的结果，
+		// 可以通过Result对象的Infos或Object方法来获取执行结果。
+		// 而Result对象中的结果，是由Visitor执行产生的。
 		Do()
 
 	err := r.Err()

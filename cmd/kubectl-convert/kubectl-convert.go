@@ -37,6 +37,7 @@ func main() {
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 
+	// 在执行每一个kubectl命令之前，都需要执行实例化cmdutil Factory接口对象的操作。
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling

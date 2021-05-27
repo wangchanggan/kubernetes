@@ -38,20 +38,27 @@ import (
 // TODO: make the functions interfaces
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
+// Factory是一个通用对象，它提供了与kube-apiserver 的交互万式，以及验证资源对象等方法。
+// cmdutil Factory接口封装了3种client-go 客户端与kube-apiserver 交互的方式，
+// 分别是 DynamicClient、KubernetesClientSet（简称 ClientSet)及RESTClient。 3种交互方式各有不同的应用场景。
 type Factory interface {
 	genericclioptions.RESTClientGetter
 
 	// DynamicClient returns a dynamic client ready for use
+	// 动态客户端
 	DynamicClient() (dynamic.Interface, error)
 
 	// KubernetesClientSet gives you back an external clientset
+	// ClientSet客户端
 	KubernetesClientSet() (*kubernetes.Clientset, error)
 
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
+	// RESTClient客户端
 	RESTClient() (*restclient.RESTClient, error)
 
 	// NewBuilder returns an object that assists in loading objects from both disk and the server
 	// and which implements the common patterns for CLI interactions with generic resources.
+	// 实例化 Builder, Builder 用于将命令行获取的参数转换成资源对象。
 	NewBuilder() *resource.Builder
 
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
@@ -61,6 +68,7 @@ type Factory interface {
 	UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error)
 
 	// Returns a schema that can validate objects stored on disk.
+	// 验证资源对象。
 	Validator(validate bool) (validation.Schema, error)
 	// OpenAPISchema returns the parsed openapi schema definition
 	OpenAPISchema() (openapi.Resources, error)

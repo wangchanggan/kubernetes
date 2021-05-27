@@ -548,6 +548,8 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		kubeConfigFlags.WrapConfigFn = nil
 	}
+
+	// 实例化cobra.Command对象，定义了kubectl的8种命令类别
 	groups := templates.CommandGroups{
 		{
 			Message: "Basic Commands (Beginner):",
@@ -645,6 +647,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		}
 	}
 
+	// 通过cmds.AddCommand方法添加命令或子命令，包含第8种命令类别——其他命令
 	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
 	cmds.AddCommand(plugin.NewCmdPlugin(f, ioStreams))

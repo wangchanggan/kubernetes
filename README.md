@@ -188,3 +188,35 @@ vendor/k8s.io/apimachinery/pkg/runtime/scheme.go:558
 vendor/k8s.io/apimachinery/pkg/conversion/converter.go:210
 
 6.设置转换后资源对象的GVK vendor/k8s.io/apimachinery/pkg/runtime/scheme.go:601
+
+
+
+## kubectl命令行交互
+### Cobra命令行参数解析
+1.创建Command vendor/k8s.io/kubectl/pkg/cmd/cmd.go:472
+
+2.以基础目命令（中级）get命令为例，添加命令行参数vendor/k8s.io/kubectl/pkg/cmd/get/get.go:155
+
+3.执行命令cmd/kubectl/kubectl.go
+
+### 创建资源对象的过程
+#### 实例化Factory接口
+cmd/kubectl-convert/kubectl-convert.go:41
+
+vendor/k8s.io/kubectl/pkg/cmd/util/factory.go:44
+
+#### Builder构建资源对象
+pkg/kubectl/cmd/convert/convert.go:122
+
+pkg/kubectl/cmd/convert/convert.go:142
+
+#### Visitor多层匿名函数嵌套
+vendor/k8s.io/cli-runtime/pkg/resource/interfaces.go:59
+
+examples/visitor.go
+
+Visitor中的VisitorList (存放Visitor 的集合)有两种
+
+vendor/k8s.io/cli-runtime/pkg/resource/visitor.go:189
+
+vendor/k8s.io/cli-runtime/pkg/resource/visitor.go:203

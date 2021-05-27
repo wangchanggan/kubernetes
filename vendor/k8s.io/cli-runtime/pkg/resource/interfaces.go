@@ -91,7 +91,11 @@ type ContentValidator interface {
 }
 
 // Visitor lets clients walk a list of resources.
+// 在 Builder Do函数中，Result对象中的结果由Visitor 执行并产生，Visitor的设计模式类似于Visitor 访问者模式。
+// Visitor 的设计较为复杂，并非单纯实现了访问者模式，它相当于一个匿名函数集。
+// 在 Kubernetes源码中,Visitor被设计为可以多层嵌套(即多层匿名函数嵌套,使用一个 Visitor嵌套另一个 Visitor）。
 type Visitor interface {
+	// Visitor 接口包含Visit方法，实现了 Visit( VisitorFunc) error 的结构体都可以成为Visitor。
 	Visit(VisitorFunc) error
 }
 
@@ -100,4 +104,5 @@ type Visitor interface {
 // will describe the problem and the function can decide how to handle that error.
 // A nil returned indicates to accept an error to continue loops even when errors happen.
 // This is useful for ignoring certain kinds of errors or aggregating errors in some way.
+// VisitorFunc是一个匿名函数，它接收Info与error信息，Into结构用于存储RESTClient请求的返回结果,而 VisitorFunc匿名函数则生成或处埋Info结构。
 type VisitorFunc func(*Info, error) error
