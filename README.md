@@ -192,6 +192,7 @@ vendor/k8s.io/apimachinery/pkg/conversion/converter.go:210
 
 
 ## kubectl命令行交互
+见docs/kubectl命令行交互.doc
 ### Cobra命令行参数解析
 1.创建Command vendor/k8s.io/kubectl/pkg/cmd/cmd.go:472
 
