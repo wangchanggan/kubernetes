@@ -76,12 +76,14 @@ func genStatus(t *types.Type) bool {
 }
 
 // GenerateType makes the body of a file implementing the individual typed client for type t.
+// 每一个代码生成器都提供了一个GenerateType函数，它是代码生成器的核心逻辑。
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	generateApply := len(g.applyConfigurationPackage) > 0
 	defaultVerbTemplates := buildDefaultVerbTemplates(generateApply)
 	subresourceDefaultVerbTemplates := buildSubresourceDefaultVerbTemplates(generateApply)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
+	// util.ParseClientGenTags 解析并验证Tags
 	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
 	if err != nil {
 		return err
@@ -203,7 +205,9 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		return sw.Error()
 	}
 
+	// 当Tags中含有get代码标记时，则为资源对象生成Get函数。
 	if tags.HasVerb("get") {
+		// 通过Go语言标准库text/template模板语言将资源信息渲染到getTemplat模板中
 		sw.Do(getTemplate, m)
 	}
 	if tags.HasVerb("list") {

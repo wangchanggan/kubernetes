@@ -3684,6 +3684,7 @@ type PodStatusResult struct {
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
+// 定义// +genclient 标签，该标签负责生成Pod 资源基本的资源探作方法（Verbs)，例如create、update、delete、get、list、 patch、 watch等方法
 type Pod struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

@@ -60,6 +60,7 @@ func DefaultNameSystem() string {
 }
 
 // Packages makes the client package definition.
+// lister-gen代码生成器并没有本身可用的Tags，它依赖于client-gen代码生成器的// +genclient 标签。
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
@@ -108,6 +109,11 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
 			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+			// 当判断是否需要生成某资源类型时，分为3个过滤条件：
+			// 第一，该资源类型拥有// +genclient 标签;
+			// 第二，该资源类型拥有list字段;
+			// 第三，该资源类型拥有get字段。
+			// 满足过滤条件以后，为该资源类型生成list和get方法。
 			if !tags.GenerateClient || !tags.HasVerb("list") || !tags.HasVerb("get") {
 				continue
 			}

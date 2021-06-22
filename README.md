@@ -221,3 +221,8 @@ Visitor中的VisitorList (存放Visitor 的集合)有两种
 vendor/k8s.io/cli-runtime/pkg/resource/visitor.go:189
 
 vendor/k8s.io/cli-runtime/pkg/resource/visitor.go:203
+
+
+
+## client-go编程式交互
+见https://github.com/wangchanggan/client-go
