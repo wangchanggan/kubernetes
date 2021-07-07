@@ -70,8 +70,11 @@ type AfterUpdateFunc func(obj runtime.Object, options *metav1.UpdateOptions)
 
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
+	// 创建资源对象时的预处理操作。
 	GetCreateStrategy() rest.RESTCreateStrategy
+	// 更新资源对象时的预处理操作。
 	GetUpdateStrategy() rest.RESTUpdateStrategy
+	// 删除资源对象时的预处理操作。
 	GetDeleteStrategy() rest.RESTDeleteStrategy
 }
 
@@ -161,6 +164,7 @@ type Store struct {
 	Decorator func(runtime.Object)
 
 	// CreateStrategy implements resource-specific behavior during creation.
+	// 创建资源对象时的预处理操作
 	CreateStrategy rest.RESTCreateStrategy
 	// BeginCreate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
@@ -170,9 +174,11 @@ type Store struct {
 	BeginCreate BeginCreateFunc
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
+	// 创建资源对象后的处理操作
 	AfterCreate AfterCreateFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
+	// 更新资源对象时的预处理操作
 	UpdateStrategy rest.RESTUpdateStrategy
 	// BeginUpdate is an optional hook that returns a "transaction-like"
 	// commit/revert function which will be called at the end of the operation,
@@ -182,12 +188,15 @@ type Store struct {
 	BeginUpdate BeginUpdateFunc
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
+	// 更新资源对象后的处理操作
 	AfterUpdate AfterUpdateFunc
 
 	// DeleteStrategy implements resource-specific behavior during deletion.
+	// 删除资源对象时的预处理操作
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
 	// deleted and before it is decorated, optional.
+	// 删除资源对象后的处理操作
 	AfterDelete AfterDeleteFunc
 	// ReturnDeletedObject determines whether the Store returns the object
 	// that was deleted. Otherwise, return a generic success status response.
@@ -209,6 +218,7 @@ type Store struct {
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
 	// either pass-through or simply dry-run.
+	// RegistryStore对Storage.Interface 通用存储接口进行的封装，实现了对Etcd集群的读/写操作。
 	Storage DryRunnableStorage
 	// StorageVersioner outputs the <group/version/kind> an object will be
 	// converted to before persisted in etcd, given a list of possible
@@ -363,6 +373,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	var finishCreate FinishFunc = finishNothing
 
 	if e.BeginCreate != nil {
+		// 通过e.BeforeCreate函数执行预处理操作
 		fn, err := e.BeginCreate(ctx, obj, options)
 		if err != nil {
 			return nil, err
@@ -398,6 +409,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 	out := e.NewFunc()
+	// 通过e.Storage.Create函数创建资源对象
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
 		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
@@ -424,6 +436,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	fn(ctx, true)
 
 	if e.AfterCreate != nil {
+		// 通过e.AfterCreate 函数执行收尾操作
 		e.AfterCreate(out, options)
 	}
 	if e.Decorator != nil {

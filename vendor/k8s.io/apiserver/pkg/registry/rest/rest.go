@@ -52,6 +52,8 @@ import (
 // Storage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
 // that objects may implement any of the below interfaces.
+// Kubernetes的每种资源(包括子资源)都提供了RESTful风格的对外资源存储服务API接口(即RESTStorage接口)，
+// 所有通过RESTful API对外暴露的资源都必须实现RESTStorage接口。
 type Storage interface {
 	// New returns an empty object that can be used with Create and Update after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)

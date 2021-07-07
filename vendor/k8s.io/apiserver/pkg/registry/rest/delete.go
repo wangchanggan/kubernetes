@@ -31,6 +31,7 @@ import (
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
 // API conventions.
+// DeleteStrategy是删除资源对象时的预处理操作，它提供了BeforeDelete 函数，用于在删除资源对象之前先执行该操作。
 type RESTDeleteStrategy interface {
 	runtime.ObjectTyper
 }
@@ -54,9 +55,11 @@ type GarbageCollectionDeleteStrategy interface {
 
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports
 // graceful deletion.
+// RESTDeleteStrategy接口并没有定义任何预处理方法，但它可以显式地转换为RESTGracefulDeleteStrategy接口
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
+	// 用于检查资源对象是否支持优雅删除，如果其支持优雅删除，则返回true, 否则返回false.
 	CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
 }
 
@@ -69,6 +72,7 @@ type RESTGracefulDeleteStrategy interface {
 // where we set deletionTimestamp is pkg/registry/generic/registry/store.go.
 // This function is responsible for setting deletionTimestamp during gracefulDeletion,
 // other one for cascading deletions.
+// DeleteStrategy操作提供了BeforeDelete 函数，它对DeleteStrategy操作的方法进行了打包、封装，在更新资源对象之前只需要执行 BeforeDelete函数即可。
 func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) (graceful, gracefulPending bool, err error) {
 	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {

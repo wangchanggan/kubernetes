@@ -158,11 +158,13 @@ func (p *Preconditions) Check(key string, obj runtime.Object) error {
 // hides all the storage-related operations behind it.
 type Interface interface {
 	// Returns Versioner associated with this interface.
+	// 资源版本管理器，用于管理Etcd集群中的数据版本对象。
 	Versioner() Versioner
 
 	// Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
 	// set to the read value from database.
+	// 创建资源对象的方法。
 	Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error
 
 	// Delete removes the specified key and returns the value that existed at that spot.
@@ -170,6 +172,7 @@ type Interface interface {
 	// If 'cachedExistingObject' is non-nil, it can be used as a suggestion about the
 	// current version of the object to avoid read operation from storage to get it.
 	// However, the implementations have to retry in case suggestion is stale.
+	// 删除资源对象的方法。
 	Delete(
 		ctx context.Context, key string, out runtime.Object, preconditions *Preconditions,
 		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object) error
@@ -181,6 +184,7 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will get current object at given key
 	// and send it in an "ADDED" event, before watch starts.
+	// 通过Watch机制监控资源对象变化方法，只应用于单个key。
 	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
 	// WatchList begins watching the specified key's items. Items are decoded into API
@@ -190,6 +194,7 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will list current objects directory defined by key
 	// and send them in "ADDED" events, before watch starts.
+	// 通过Watch机制监控资源对象变化方法，应用于多个key(当前目录及目录下所有的key)。
 	WatchList(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
 	// Get unmarshals json found at key into objPtr. On a not found error, will either
@@ -197,18 +202,21 @@ type Interface interface {
 	// Treats empty responses and nil response nodes exactly like a not found error.
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	// 获取资源对象的方法。
 	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
 	// GetToList unmarshals json found at key and opaque it into *List api object
 	// (an object that satisfies the runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	// 获取资源对象的方法，以列表(List) 的形式返回。
 	GetToList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// List unmarshalls jsons found at directory defined by key and opaque them
 	// into *List api object (an object that satisfies runtime.IsList definition).
 	// The returned contents may be delayed, but it is guaranteed that they will
 	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	// 获取资源对象的方法，以列表(List) 的形式返回。
 	List(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
 	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
@@ -242,11 +250,13 @@ type Interface interface {
 	//       return cur, nil, nil
 	//    },
 	// )
+	// 保证传入的tryUpdate函数运行成功
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 		precondtions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
+	// 获取指定key下的条目数量
 	Count(key string) (int64, error)
 }
 

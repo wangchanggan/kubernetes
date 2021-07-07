@@ -36,30 +36,37 @@ import (
 // name generation behavior to update an object that follows Kubernetes
 // API conventions. A resource may have many UpdateStrategies, depending on
 // the call pattern in use.
+// UpdateStrategy是更新资源对象时的预处理操作，它提供了BeforeUpdate 函数，用于在更新资源对象之前先执行该操作。
 type RESTUpdateStrategy interface {
 	runtime.ObjectTyper
 	// NamespaceScoped returns true if the object must be within a namespace.
+	// 判断当前资源对象是否拥有所属的命名空间，如有所属的命名空间，则返回true，否则返回false.
 	NamespaceScoped() bool
 	// AllowCreateOnUpdate returns true if the object can be created by a PUT.
+	// 在更新当前资源对象时，如果资源对象已存在，确定是否允许重新创建资源对象。
 	AllowCreateOnUpdate() bool
 	// PrepareForUpdate is invoked on update before validation to normalize
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
+	// 更新当前资源对象之前的处理函数。
 	PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
+	// 更新当前资源对象之前的验证函数。验证资源对象的字段信息，此方法不会修改资源对象。
 	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
 	// validation has succeeded but before the object has been persisted.
 	// This method may mutate the object.
+	// 在更新当前资源对象之前将存储的资源对象规范化。
 	Canonicalize(obj runtime.Object)
 	// AllowUnconditionalUpdate returns true if the object can be updated
 	// unconditionally (irrespective of the latest resource version), when
 	// there is no resource version specified in the object.
+	// 在更新当前资源对象时，如果未指定资源版本，确定是否运行更新操作。
 	AllowUnconditionalUpdate() bool
 }
 
@@ -84,6 +91,8 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
 // It sets zero values only if the object does not have a zero value for the respective field.
+// UpdateStratrey 操作提供了BeforeUpdate函数，它对UpdateStrategy操作的方法进行了打包、封装，并使各方法按顺序执行，在更新资源对象之前只需要执行BeforeUpdate函数即可。
+// 此BeforeUpdate函数与CreateStrategy操作提供的BeforeCreate函数的流程大致相同，故不再赘述。
 func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {

@@ -131,6 +131,7 @@ func storeElementIndexers(indexers *cache.Indexers) cache.Indexers {
 //
 // watchCache is a "sliding window" (with a limited capacity) of objects
 // observed from a watch.
+// watchCache使用缓存滑动窗口(即数组)保存事件，其功能有些类似于FIFO队列，但实现方式不同
 type watchCache struct {
 	sync.RWMutex
 
@@ -139,6 +140,8 @@ type watchCache struct {
 	cond *sync.Cond
 
 	// Maximum size of history window.
+	// 缓存滑动窗口的大小，其值通过--default-watch-cache-size参数指定，默认的缓存滑动窗口的大小为100。
+	// 如果将其设置为0，则表示禁用watchCache。
 	capacity int
 
 	// upper bound of capacity since event cache has a dynamic size.
@@ -158,9 +161,12 @@ type watchCache struct {
 	// by endIndex (if cache is full it will be startIndex + capacity).
 	// Both startIndex and endIndex can be greater than buffer capacity -
 	// you should always apply modulo capacity to get an index in cache array.
-	cache      []*watchCacheEvent
+	// 缓存滑动窗口，可以通过一个固定大小的数组向前滑动。当缓存窗口满的时候，将最先进入缓存滑动窗口的数据淘汰。
+	cache []*watchCacheEvent
+	// 开始下标。
 	startIndex int
-	endIndex   int
+	// 结束下标。
+	endIndex int
 
 	// store will effectively support LIST operation from the "end of cache
 	// history" i.e. from the moment just after the newest cached watched event.
@@ -272,6 +278,12 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
+// CacherStorage在实例化过程中会使用Reflector框架的ListAndWatch函数通过UnderlyingStorage监控 Etcd集群的 Watch 事件。
+// watchCache接收Reflector 框架的事件回调，并实现了Add、 Update、 Delete方法,分别用于接收watch.Added、 watch.Modified、watch.Deleted事件。
+// 通过 goroutine(即w.processEvent函数)将事件分别存储到如下3个地方。
+// w.eventHandler：将事件回调给 CacherStorage, CacherStorage将其分发给目前所有已连接的观察者，该过程通过非阻塞机制实现
+// w.cache：将事件存储至缓存滑动窗口，它提供了对Watch操作的缓存数据，防止因网络或其他原因观察者连接中断,导致事件丢失。
+// cache.Store：将事件存储至本地缓存，cache.Store 与client-go下的 Indexer 功能相同。
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
 	key, err := w.keyFunc(event.Object)
 	if err != nil {
@@ -312,10 +324,12 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 			wcEvent.PrevObjFields = previousElem.Fields
 		}
 
+		// 通过w.updateCache存储至缓存滑动窗口
 		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
+		// 通过updateFunc函数存储至cache.Store本地缓存中
 		return updateFunc(elem)
 	}(); err != nil {
 		return err
@@ -326,6 +340,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	// UpdateResourceVersion in flight at any point in time, which is true now,
 	// because reflector calls them synchronously from its main thread.
 	if w.eventHandler != nil {
+		// watchCache将接收到的事件通过w.eventHandler函数( 实际使用的是cacher.processEvent 函数)回调给CacherStorage
 		w.eventHandler(wcEvent)
 	}
 	return nil
@@ -338,6 +353,8 @@ func (w *watchCache) updateCache(event *watchCacheEvent) {
 		// Cache is full - remove the oldest element.
 		w.startIndex++
 	}
+	// 在接收到Reflector框架的事件回调后，将事件放入缓存滑动窗口的头部，此时endIndex与capacity会通过取模运算得到下一个事件的位置，然后endIndex会自增1。
+	// 当缓存滑动窗口满的时候，endIndex 与capacity会通过取模运算指定最先进入缓存滑动窗口的数据并覆盖该数据。
 	w.cache[w.endIndex%w.capacity] = event
 	w.endIndex++
 }
@@ -557,6 +574,7 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 	w.onReplace = onReplace
 }
 
+// GetAllEventsSinceThreadUnsafe 函数接收resourceVersion参数，
 func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*watchCacheEvent, error) {
 	size := w.endIndex - w.startIndex
 	var oldest uint64
@@ -576,6 +594,7 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 		return nil, fmt.Errorf("watch cache isn't correctly initialized")
 	}
 
+	// 当resourceVersion 为0时，从cache.Store本地缓存中获取历史事件并返回;
 	if resourceVersion == 0 {
 		// resourceVersion = 0 means that we don't require any specific starting point
 		// and we would like to start watching from ~now.
@@ -613,9 +632,11 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 	f := func(i int) bool {
 		return w.cache[(w.startIndex+i)%w.capacity].ResourceVersion > resourceVersion
 	}
+	// 当resourceVersion大于0时，将w.cache缓存滑动窗口根据resourceVersion值的大小进行排序
 	first := sort.Search(size, f)
 	result := make([]*watchCacheEvent, size-first)
 	for i := 0; i < size-first; i++ {
+		// 根据传入的resourceVersion按照区间获取历史事件
 		result[i] = w.cache[(w.startIndex+first+i)%w.capacity]
 	}
 	return result, nil

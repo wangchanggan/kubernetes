@@ -248,7 +248,8 @@ type SimpleRestOptionsFactory struct {
 
 func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:           &f.Options.StorageConfig,
+		StorageConfig: &f.Options.StorageConfig,
+		// 如果不启用WatchCache功能，Kubernetes API Server通过generic.UndecoratedStorage函数直接创建UnderlyingStorage底层存储对象并返回。
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: f.Options.EnableGarbageCollection,
 		DeleteCollectionWorkers: f.Options.DeleteCollectionWorkers,
@@ -272,6 +273,10 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		if ok && size <= 0 {
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			// 在默认的情况下，Kubernetes API Server的缓存功能是开启的，可通过--watch-cache参数设置
+			// 如果该参数为true, 则通过genricgisty.StorageWithCacher函数创建带有缓存功能的资源存储对象。
+			// CacherStorage实际上是在UnderlyingStorage 之上封装了一层缓存层，
+			// 在genericregistry.StorageWithCacher函数实例化的过程中，也会创建UnderlyingStorage底层存储对象。
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}

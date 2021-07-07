@@ -63,6 +63,7 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 
 var _ value.Context = authenticatedDataString("")
 
+// 底层存储对象，真正与Eted集群交互的资源存储对象
 type store struct {
 	client        *clientv3.Client
 	codec         runtime.Codec
@@ -114,6 +115,7 @@ func (s *store) Versioner() storage.Versioner {
 func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, out runtime.Object) error {
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
+	// 通过s.client.KV.Get获取Etcd集群中Pod资源对象的数据。
 	getResp, err := s.client.KV.Get(ctx, key)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
 	if err != nil {
@@ -946,11 +948,13 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	if _, err := conversion.EnforcePtr(objPtr); err != nil {
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
+	// 通过protobufSerializer 编解码器（即codec.Decode函数)解码二进制数据, 解码后的数据存放至objPtr中。
 	_, _, err := codec.Decode(value, nil, objPtr)
 	if err != nil {
 		return err
 	}
 	// being unable to set the version does not prevent the object from being extracted
+	// 最后通过versioner.UpdateObject函数更新最新的资源对象的resourceVersion 资源版本号（即 kv.ModRevision，也称为modifiedIndex)。
 	if err := versioner.UpdateObject(objPtr, uint64(rev)); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
 	}

@@ -222,6 +222,7 @@ type indexedTriggerFunc struct {
 // based on the underlying storage contents.
 // Cacher implements storage.Interface (although most of the calls are just
 // delegated to the underlying storage).
+// 带有缓存功能的资源存储对象
 type Cacher struct {
 	// HighWaterMarks for performance debugging.
 	// Important: Since HighWaterMark is using sync/atomic, it has to be at the top of the struct due to a bug on 32-bit platforms
@@ -449,6 +450,7 @@ func (c *Cacher) Delete(
 }
 
 // Watch implements storage.Interface.
+// 每一个发送 Watch 请求的客户端都会分配一个 cacheWatcher，用于客户端接收Watch 事件
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	pred := opts.Predicate
 	watchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
@@ -494,6 +496,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
+	//
+	// 当客户端发起 Watch 请求时，通过newCacheWatcher函数实例化 cacheWatcher对象，并为其分配一个id
+	// 该id是唯一的，从0开始计数，每次有新的客户端发送Watch 请求时，该id会自增1，但在 Kubernetes API Server重启时其会被清零。
+	// cacheWatcher通过map数据结构进行管理，其中key为id, value为cacheWatcher
 	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
@@ -523,6 +529,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		defer c.Unlock()
 		// Update watcher.forget function once we can compute it.
 		watcher.forget = forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
+		// 将该对象添加到c.watchers中进行统一管理，例如执行Add(添加）、Delete（删除）、Terminate(终止）等操作。
 		c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 
 		// Add it to the queue only when the client support watch bookmarks.
@@ -532,6 +539,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.watcherIdx++
 	}()
 
+	//在通过newCacheWatcher函数进行实例化时，内部会运行一个goroutine（即watcher.process 函数)，用于监控c.input Channel中的数据。
 	go watcher.process(ctx, initEvents, watchRV)
 	return watcher, nil
 }
@@ -1248,6 +1256,8 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 }
 
 // Nil timer means that add will not block (if it can't send event immediately, it will break the watcher)
+// Cacher接收到watchCache回调的事件，遍历目前所有已连接的观察者，并将事件逐个分发给每个观察者，该过程通过非阻塞机制实现，不会阻塞任何一个观察者。
+// dispatchEvents→dispatchEvent→watcher.add
 func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 	// Try to send the event immediately, without blocking.
 	if c.nonblockingAdd(event) {
@@ -1422,6 +1432,8 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 				return
 			}
 			// only send events newer than resourceVersion
+			// 当其中没有数据时,监控c.input Channel 时处于阻塞状态;
+			// 当其中有数据时，数据会通过ResultChan 函数对外暴露，只发送大于ResourceVersion 资源版本号的数据。
 			if event.ResourceVersion > resourceVersion {
 				c.sendWatchCacheEvent(event)
 			}

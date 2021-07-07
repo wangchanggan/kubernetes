@@ -226,3 +226,72 @@ vendor/k8s.io/cli-runtime/pkg/resource/visitor.go:203
 
 ## client-go编程式交互
 见https://github.com/wangchanggan/client-go
+
+
+
+## Etcd存储核心实现
+### RESTStorage存储服务通用接口
+vendor/k8s.io/apiserver/pkg/registry/rest/rest.go:57
+
+Kubernetes的每种资源实现的RESTStorage 接口一般定义在pkg/registy/<资源组>/<资源>/storage/storage.go中，它们通过NewStorage函数或NewREST函数实例化。
+以Deployment资源为例pkg/registry/apps/deployment/storage/storage.go:51,128
+
+
+### RegistryStore存储服务通用操作
+RegistryStore结构vendor/k8s.io/apiserver/pkg/registry/generic/registry/store.go:94
+
+以RegistryStore的Create方法（创建资源对象的方法）为例vendor/k8s.io/apiserver/pkg/registry/generic/registry/store.go:369
+
+
+### Storage.Interface通用存储接口
+Storage.Interface通用存储接口定义的资源操作方法vendor/k8s.io/apiserver/pkg/storage/interfaces.go:195
+
+实现通用存储接口的资源存储对象
+
+vendor/k8s.io/apiserver/pkg/storage/cacher/cacher.go:226
+
+vendor/k8s.io/apiserver/pkg/storage/etcd3/store.go:67
+
+实例化过程vendor/k8s.io/apiserver/pkg/server/options/etcd.go:249
+
+
+### CacherStorage缓存层
+#### CacherStorage缓存层设计
+1.cacheWatcher
+
+vendor/k8s.io/apiserver/pkg/storage/cacher/cacher.go:454,1394
+
+2.watchCache
+
+vendor/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go:281
+
+3.Cacher
+
+vendor/k8s.io/apiserver/pkg/storage/cacher/cacher.go:1261
+
+
+#### watchCache 缓存滑动窗口
+vendor/k8s.io/apiserver/pkg/storage/cacher/watch_cache.go:135,350,578
+
+
+### UnderlyingStorage底层存储对象
+vendor/k8s.io/apiserver/pkg/storage/storagebackend/factory/etcd3.go:225
+
+以Get操作为例vendor/k8s.io/apiserver/pkg/storage/etcd3/store.go:115,947
+
+
+### Codec编解码数据
+examples/codec.go
+
+
+### Strategy预处理
+vendor/k8s.io/apiserver/pkg/registry/generic/registry/store.go:72
+
+#### 创建资源对象时的预处理操作
+vendor/k8s.io/apiserver/pkg/registry/rest/create.go:40,80
+
+#### 更新资源对象时的预处理操作
+vendor/k8s.io/apiserver/pkg/registry/rest/update.go:40,96
+
+#### 删除资源对象时的预处理操作
+vendor/k8s.io/apiserver/pkg/registry/rest/delete.go:35,59,76

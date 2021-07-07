@@ -47,9 +47,10 @@ import (
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
+// Deployment资源定义了REST数据结构与StatusREST数据结构
 type DeploymentStorage struct {
-	Deployment *REST
-	Status     *StatusREST
+	Deployment *REST       // 用于实现deployment资源的RESTStorage接口
+	Status     *StatusREST // 用于实现deployment/status子资源的RESTStorage接口
 	Scale      *ScaleREST
 	Rollback   *RollbackREST
 }
@@ -123,6 +124,7 @@ func (r *REST) WithCategories(categories []string) *REST {
 }
 
 // StatusREST implements the REST endpoint for changing the status of a deployment
+// 每一个RESTStorage 接口都对RegistryStore操作进行了封装，例如，对deployment/status子资源进行Get操作时，实际执行的是RegitryStore操作
 type StatusREST struct {
 	store *genericregistry.Store
 }
