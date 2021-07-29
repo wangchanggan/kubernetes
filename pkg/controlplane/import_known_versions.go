@@ -16,6 +16,8 @@ limitations under the License.
 
 package controlplane
 
+// kube-apiserver启动时导入了controlplane包，controlplane包中的import_known_versions.go文件调用了Kubernetes资源下的install 包，通过导入包的机制触发初始化函数
+// 每个Kubernetes内部版本资源都定义install 包，用于在kube-apiserver启动时注册资源。
 import (
 	// These imports are the API groups the API server will support.
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
@@ -28,6 +30,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
 	_ "k8s.io/kubernetes/pkg/apis/coordination/install"
+	// 以core资源组为例，根据Go语言的导入和初始化机制，会触发每个资源install包下的init 函数来完成资源的注册过程
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/discovery/install"
 	_ "k8s.io/kubernetes/pkg/apis/events/install"

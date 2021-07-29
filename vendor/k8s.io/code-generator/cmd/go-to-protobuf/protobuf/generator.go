@@ -111,6 +111,7 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 		return isProtoable(seen, t.Elem)
 	case types.Map:
 		return isProtoable(seen, t.Key) && isProtoable(seen, t.Elem)
+	// go-to-protobuf代码生成器遍历输入源包中的所有类型，若类型为types.Struct,则为该类型生成generated.proto文件
 	case types.Struct:
 		if len(t.Members) == 0 {
 			return true

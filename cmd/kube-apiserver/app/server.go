@@ -68,6 +68,8 @@ import (
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	// kube-apiserver 导入了legacyscheme和controlplane包。
+	// kube-apiserver 资源注册分为两步:第1步，初始化Scheme资源注册表;第2步，注册Kubernetes所支持的资源。
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/controlplane"
@@ -103,6 +105,7 @@ func checkNonZeroInsecurePort(fs *pflag.FlagSet) error {
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
+	// 首先kube-apiserver组件通过options.NewServerRunOptions初始化各个模块的默认配置，例如初始化Etcd、Audit、Admission 等模块的默认配置。
 	s := options.NewServerRunOptions()
 	cmd := &cobra.Command{
 		Use: "kube-apiserver",
@@ -129,16 +132,19 @@ cluster's shared state through which all other components interact.`,
 				return err
 			}
 			// set default options
+			// 通过Complete函数填充默认的配置参数
 			completedOptions, err := Complete(s)
 			if err != nil {
 				return err
 			}
 
 			// validate options
+			// 通过Validate函数验证配置参数的合法性和可用性。
 			if errs := completedOptions.Validate(); len(errs) != 0 {
 				return utilerrors.NewAggregate(errs)
 			}
 
+			// // 将completedOptions(kube-apiserver 组件的运行配置)对象传入Run函数，Run函数定义了kube-apiserver组件启动的逻辑，它是一个运行不退出的常驻进程。
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -451,7 +457,12 @@ func buildGenericConfig(
 	storageFactory *serverstorage.DefaultStorageFactory,
 	lastErr error,
 ) {
+	//通过 genericapiserver.NewConfig函数实例化 genericConfig 对象,并为genericConfig对象设置默认值
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+
+	// genericConfig.MergedResourceConfig用于设置启用/禁用GV(资源组、资源版本)及其 Resource（资源)。
+	// 如果未在命令行参数中指定启用/禁用的GV ，则通过 master.DefaultAPIResourceConfigSource 启用默认设置的GV及其资源。
+	// master.DefaultAPIResourceConfigSource将启用资源版本为Stable和 Beta的资源，默认不启用 Alpha 资源版本的资源。
 	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
@@ -471,6 +482,8 @@ func buildGenericConfig(
 		return
 	}
 
+	// genericConfig.OpenAPIConfig用于生成OpenAPI规范。在默认的情况下，通过DefaultOpenAPIConfig函数为其设置默认值
+	// 其中 generatedopenapi.GetOpenAPIDefinitions 定义了OpenAPIDefinitions 文件(OpenAPI定义文件)，该文件由openapi-gen代码生成器自动生成。
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme))
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
 	genericConfig.LongRunningFunc = filters.BasicLongRunningRequestCheck(
@@ -481,6 +494,9 @@ func buildGenericConfig(
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 
+	// kubeapiserver.NewStorageFactoryConfig函数实例化了storageFactoryConfig 对象，
+	// 该对象定义了kube-apiserver与Etcd的交互方式，例如Etcd认证、Etcd 地址、存储前缀等。
+	// 另外，该对象也定义了资源存储方式，例如资源信息、资源编码类型、资源状态等。
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
 	completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd)

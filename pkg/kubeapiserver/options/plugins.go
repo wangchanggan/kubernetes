@@ -104,6 +104,9 @@ var AllOrderedPlugins = []string{
 
 // RegisterAllAdmissionPlugins registers all admission plugins and
 // sets the recommended plugins order.
+// admit( AlwaysAdmit)、deny (AlwaysDeny)和label (PersistentVolumeLabel) 准入控制器在当前的Kubernetes 系统中已被弃用。
+// exec.Register(plugins)中注册了两个准入控制器，分别为DenyEscalatingExec、DenyExecOnPrivileged。
+// 所有注册的准入控制器全都存放在Plugins数据结构的registry 字段中。
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins) // DEPRECATED as no real meaning
 	alwayspullimages.Register(plugins)

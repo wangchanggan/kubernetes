@@ -28,6 +28,7 @@ import (
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// protobuf引用了Timestamp结构体，并同时为Timestamp结构体生成代码
 type Time struct {
 	time.Time `protobuf:"-"`
 }

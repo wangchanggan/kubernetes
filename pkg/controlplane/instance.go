@@ -662,6 +662,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
+	// 通过 EnableVersions 函数启用指定资源，而通过DisableVersions函数禁用指定资源
 	ret.EnableVersions(
 		admissionregistrationv1.SchemeGroupVersion,
 		admissionregistrationv1beta1.SchemeGroupVersion,

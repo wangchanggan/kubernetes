@@ -230,6 +230,7 @@ vendor/k8s.io/cli-runtime/pkg/resource/visitor.go:203
 
 
 ## Etcd存储核心实现
+见docs/Etcd存储核心实现.doc
 ### RESTStorage存储服务通用接口
 vendor/k8s.io/apiserver/pkg/registry/rest/rest.go:57
 
@@ -295,3 +296,94 @@ vendor/k8s.io/apiserver/pkg/registry/rest/update.go:40,96
 
 #### 删除资源对象时的预处理操作
 vendor/k8s.io/apiserver/pkg/registry/rest/delete.go:35,59,76
+
+
+
+## kube-apiserver核心实现
+见docs/kube-apiserver核心实现.doc
+
+### 热身概念
+
+#### go-restful核心原理
+vendor/github.com/emicklei/go-restful/container.go:205
+
+#### OpenAPI/Swagger核心原理
+Kubernetes在注册go restful路由时，将资源信息与OpenAPI自定义扩展属性进行了关联vendor/k8s.io/apiserver/pkg/endpoints/installer.go:992
+
+#### gRPC核心原理
+1.引用类Tags
+
+vendor/k8s.io/apimachinery/pkg/apis/meta/v1/time.go:32
+
+vendor/k8s.io/apimachinery/pkg/apis/meta/v1/time_proto.go:26
+
+vendor/k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto:1038
+
+2.嵌入类Tags
+
+vendor/k8s.io/apimachinery/pkg/api/resource/quantity.go:90
+
+vendor/k8s.io/apimachinery/pkg/api/resource/generated.proto:86
+
+3.go-to-protobuf的生成规则
+
+vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf/generator.go:99
+
+vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf/cmd.go:106
+
+
+### kube-apiserver启动流程
+#### 资源注册
+以KubeAPIServer (API核心服务)为例cmd/kube-apiserver/app/server.go:73
+
+1.初始化Scheme资源注册表pkg/api/legacyscheme/scheme.go
+
+2.注册Kubernetes所支持的资源
+pkg/controlplane/import_known_versions.go
+
+#### Cobra命令行参数解析
+cmd/kube-apiserver/app/server.go:107
+
+#### 创建APIServer通用配置
+1.genericConfig实例化
+
+cmd/kube-apiserver/app/server.go:461
+
+pkg/controlplane/instance.go:665
+
+2.OpenAPI/Swagger配置 cmd/kube-apiserver/app/server.go:487
+
+3.StorageFactory存储(Etcd)配置 cmd/kube-apiserver/app/server.go:500
+
+4.Authentication认证配置 pkg/kubeapiserver/authenticator/config.go:207
+
+5.Authorization授权配置 pkg/kubeapiserver/authorizer/config.go:77
+
+6.Admission准入控制器配置
+
+vendor/k8s.io/apiserver/pkg/admission/plugins.go:39
+
+vendor/k8s.io/apiserver/pkg/server/plugins.go
+
+pkg/kubeapiserver/options/plugins.go:110
+
+以AlwaysPullImages准入控制器为例，注册方法plugin/pkg/admission/alwayspullimages/admission.go:45
+
+#### 创建APIExtensionsServer
+1.创建 GenericAPIServer vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:130
+
+2.实例化 CustomResourceDefinitions vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:136
+
+3.实例化 APIGroupInfo
+
+vendor/k8s.io/apiserver/pkg/server/genericapiserver.go:64
+
+vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:149
+
+4.InstallAPIGroup注册APIGroup
+
+vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:185
+
+vendor/k8s.io/apiserver/pkg/endpoints/groupversion.go:109
+
+

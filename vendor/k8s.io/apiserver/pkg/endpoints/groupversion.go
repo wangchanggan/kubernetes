@@ -105,17 +105,24 @@ type APIGroupVersion struct {
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
+// InstallREST函数接收restful.Container指针对象。安装过程分为4步
 func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storageversion.ResourceInfo, error) {
+	// prefix定义了HTTP PATH请求路径，其表现形式为<apiPrefix>/<group>/<version> ( 即/apis/apiextensions.k8s.io/v1betal )。
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
+	// 实例化APIInstaller安装器。
 	installer := &APIInstaller{
 		group:             g,
 		prefix:            prefix,
 		minRequestTimeout: g.MinRequestTimeout,
 	}
 
+	// 在install.Install 安装器内部创建一个go-restful WebService，然后通过a.registerResourceHandlers函数，
+	// 为资源注册对应的Handlers 方法( 即资源存储对象Resource Storage),
+	// 完成资源与资源Handlers方法的绑定并为go-restful WebService添加该路由。
 	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
 	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
+	// 最后通过container.Add函数将WebService添加到go-restful Container中。
 	container.Add(ws)
 	return removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
 }

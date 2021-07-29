@@ -82,6 +82,7 @@ option go_package = "resource";
 // +protobuf.options.(gogoproto.goproto_stringer)=false
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
+// Quantity结构体通过protobuf.embed指定了string类型，通过go-to-protobuf代码生成器生成代码
 message Quantity {
   optional string string = 1;
 }

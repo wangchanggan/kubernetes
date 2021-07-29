@@ -58,6 +58,9 @@ import (
 )
 
 // Info about an API group.
+// APIGroupInfo 对象用于描述资源组信息，其中该对象的VersionedResourcesStorageMap字段用于存储资源与资源存储对象的对应关系，
+// 其表现形式为map[string]map[string]rest.Storage(即<资源版本/<资源>/<资源存储对象>),
+// 例如 CustomResourceDefinitions 资源与资源存储对象的映射关系是 vlbeta1/customresourcedefinitions/customResourceDefintionStorage
 type APIGroupInfo struct {
 	PrioritizedVersions []schema.GroupVersion
 	// Info about the resources in this group. It's a map from version to resource to the storage.

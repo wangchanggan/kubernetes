@@ -201,6 +201,9 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		return nil, &securityDefinitions, nil
 	}
 
+	// authenticators中存放的是已启用的认证器列表。union.New 函数将authenticators合并成一个auonicator 认证器，
+	// 实际上将认证器列表存放在union 结构的Handlers []authenticator.Request对象中。
+	// 当客户端请求到达kube-apiserver时，kube-apiserver会遍历认证器列表，尝试执行每个认证器，当有一个认证器返回tue时，则认证成功。
 	authenticator := union.New(authenticators...)
 
 	authenticator = group.NewAuthenticatedGroupAdder(authenticator)

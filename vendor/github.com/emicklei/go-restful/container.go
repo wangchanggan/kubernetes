@@ -200,6 +200,8 @@ func (c *Container) Dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 }
 
 // Dispatch the incoming Http Request to a matching WebService.
+// go-restful核心数据结构有Container、 WebService、 Route。
+// 其核心原理是将Container接收到的HTTP请求分发给匹配的WebService, 再由WebService 分发给Router中的Handler函数。
 func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.Request) {
 	writer := httpWriter
 
@@ -227,6 +229,8 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 	func() {
 		c.webServicesLock.RLock()
 		defer c.webServicesLock.RUnlock()
+		// 通过c.router.SelectRoute根据请求匹配到最优的WebService- →Router，其中包含两种RouteSelector, 分别是RouterJSR311和CurlyRouter
+		// CurlyRoute 是基于routerJSR311 实现的，在其基础上支持正则表达式和动态参数，默认go-restful框架使用CurlyRoute;
 		webService, route, err = c.router.SelectRoute(
 			c.webServices,
 			httpRequest)
@@ -285,6 +289,7 @@ func (c *Container) dispatch(httpWriter http.ResponseWriter, httpRequest *http.R
 		chain.ProcessFilter(wrappedRequest, wrappedResponse)
 	} else {
 		// no filters, handle request by route
+		// 根据请求路径调用对应的Handler 函数，执行route.Function函数。
 		route.Function(wrappedRequest, wrappedResponse)
 	}
 }

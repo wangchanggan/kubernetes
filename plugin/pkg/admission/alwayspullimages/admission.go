@@ -43,6 +43,7 @@ const PluginName = "AlwaysPullImages"
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
+	// 每个准入控制器都实现了Register方法，通过Register方法可以在Plugins数据结构中注册当前准入控制器。
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewAlwaysPullImages(), nil
 	})

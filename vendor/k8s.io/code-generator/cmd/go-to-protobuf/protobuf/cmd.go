@@ -99,6 +99,10 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.StringVar(&g.DropEmbeddedFields, "drop-embedded-fields", g.DropEmbeddedFields, "Comma-delimited list of embedded Go types to omit from generated protobufs")
 }
 
+// go-to-protobuf代码生成器中的Run函数会执行3条命令，分别是protoc .goimports和gofmt，后两条命令用于统一代码风格。
+// protoc命令用于生成generated.pb.go文件:
+// goimports命令用于对Go代码文件中的import代码块进行自动修正；
+// gofimt 命令用于对Go代码进行格式化，统一代码风格。
 func Run(g *Generator) {
 	if g.Common.VerifyOnly {
 		g.OnlyIDL = true
@@ -273,6 +277,7 @@ func Run(g *Generator) {
 		}
 
 		// generate the gogoprotobuf protoc
+		// 在go-to-protobuf代码生成器生成generated.proto文件后，通过protoc二进制命令生成generated.pb.go文件
 		cmd := exec.Command("protoc", append(args, path)...)
 		out, err := cmd.CombinedOutput()
 		if len(out) > 0 {

@@ -74,8 +74,12 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 	}
 
 	var (
-		authorizers   []authorizer.Authorizer
-		ruleResolvers []authorizer.RuleResolver
+		authorizers   []authorizer.Authorizer   // 已启用的授权器列表
+		ruleResolvers []authorizer.RuleResolver // 已启用的授权器规则解析器
+
+		// 实际上分别将它们存放在union结构的[]authorizer.Authorizer和 []authorizer.RuleResolver对象中。
+		// 当客户端请求到达kube-apiserver时，kube-apiserver 会遍历授权器列表，并按照顺序执行授权器，排在前面的授权器具有更高的优先级 (允许或拒绝请求)。
+		// 客户端发起一个请求，在经过授权阶段时，只要有一个授权器通过，则授权成功。
 	)
 
 	for _, authorizationMode := range config.AuthorizationModes {
