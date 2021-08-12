@@ -425,8 +425,7 @@ vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf/cmd.go:106
 
 1.初始化Scheme资源注册表pkg/api/legacyscheme/scheme.go
 
-2.注册Kubernetes所支持的资源
-pkg/controlplane/import_known_versions.go
+2.注册Kubernetes所支持的资源pkg/controlplane/import_known_versions.go
 
 #### Cobra命令行参数解析
 cmd/kube-apiserver/app/server.go:107
