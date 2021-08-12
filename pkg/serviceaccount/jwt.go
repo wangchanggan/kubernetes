@@ -255,11 +255,15 @@ type Validator interface {
 	NewPrivateClaims() interface{}
 }
 
+// ServiceAccountAuth认证接口定义了AuthenticateToken 方法，该方法接收token字符串。
+// 若验证失败，bool 值会为false; 若验证成功，bool 值会为true, 并返回*authenticator.Response
+// *authenticator.Response 中携带了身份验证用户的信息，例如Name、UID、Groups、 Extra 等信息。
 func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
 
+	// 在进行ServiceAccountAuth认证时，通过jwt.ParseSigned函数解析出JWT对象，
 	tok, err := jwt.ParseSigned(tokenData)
 	if err != nil {
 		return nil, false, nil
@@ -307,11 +311,15 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
+	// 通过j.validator.Validate函数验证签名及Token, 验证命名空间是否正确，验证ServiceAccountName、ServiceAccountUID是否存在，
+	// 验证Tokeo是否失效等，如果验证不合法，则认证失败井返回false；如果验证合法，则认证成功并返回true。
 	sa, err := j.validator.Validate(ctx, tokenData, public, private)
 	if err != nil {
 		return nil, false, err
 	}
 
+	// 如果Token 能够通过认证，那么请求的用户名将被设置为system:serviceaccount:(NAMESPACE):(SERVICEACCOUNT)，
+	// 而请求的组名有两个，即system:serviceaccounts和system:serviceaccounts(NAMESPACE)
 	return &authenticator.Response{
 		User:      sa.UserInfo(),
 		Audiences: auds,

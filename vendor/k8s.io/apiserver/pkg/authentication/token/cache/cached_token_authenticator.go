@@ -121,6 +121,9 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 }
 
 // AuthenticateToken implements authenticator.Token
+// WebhookTokenAuth 认证接口定义了AuthenticateToken 方法，该方法接收token 字符串。
+// 若验证失败，bool 值会为false; 若验证成功，bool 值会为true, 并返回 *authenticator.Response
+// *authenticator.Response 中携带了身份验证用户的信息，例如 Name、UID、Groups、 Extra 等信息。
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	record := a.doAuthenticateToken(ctx, token)
 	if !record.ok || record.err != nil {
@@ -138,6 +141,7 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 	auds, audsOk := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(a.hashPool, auds, token)
+	// 在进行WebookTokenAuth认证时，首先从缓存中查找是否已有缓存认证，如果有则直接返回
 	if record, ok := a.cache.get(key); ok {
 		// Record cache hit
 		doneAuthenticating(true)
@@ -191,6 +195,7 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 		ev := &auditinternal.Event{Level: auditinternal.LevelMetadata}
 		ctx = request.WithAuditEvent(ctx, ev)
 
+		// 如果没有则通过a.authenticator.AuthenticateToken对远程的Webhook服务器进行验证。
 		record.resp, record.ok, record.err = a.authenticator.AuthenticateToken(ctx, token)
 		record.annotations = ev.Annotations
 

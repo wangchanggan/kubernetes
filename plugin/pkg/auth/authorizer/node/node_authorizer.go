@@ -92,6 +92,7 @@ func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorize
 }
 
 func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	// 在进行Node授权时，通过r.identifier.NodeIdentity函数获取角色信息，并验证其是否为system:node内置角色，nodeName 的表现形式为system:node:<nodeName>。
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes
@@ -133,6 +134,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 	}
 
 	// Access to other resources is not subdivided, so just evaluate against the statically defined node rules
+	// 通过rbac.RulesAllow函数进行RBAC授权，如果授权成功，返回DecisionAllow决策状态。
 	if rbac.RulesAllow(attrs, r.nodeRules...) {
 		return authorizer.DecisionAllow, "", nil
 	}

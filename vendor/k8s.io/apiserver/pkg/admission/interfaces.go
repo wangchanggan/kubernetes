@@ -131,8 +131,11 @@ type MutationInterface interface {
 
 	// Admit makes an admission decision based on the request attributes.
 	// Context is used only for timeout/deadline/cancellation and tracing information.
+	// 变更准入控制器接口拥有Admit 方法
 	Admit(ctx context.Context, a Attributes, o ObjectInterfaces) (err error)
 }
+
+// 有些准入控制器可能同时实现了Admit和Validate方法，能够执行变更操作，也能够执行验证操作，例如AlwaysPullmages准入控制器。
 
 // ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
 type ValidationInterface interface {
@@ -140,6 +143,7 @@ type ValidationInterface interface {
 
 	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
 	// Context is used only for timeout/deadline/cancellation and tracing information.
+	// 验证准入控制器接口拥有Validate 方法。
 	Validate(ctx context.Context, a Attributes, o ObjectInterfaces) (err error)
 }
 

@@ -167,6 +167,7 @@ func (cfg *Config) Complete() CompletedConfig {
 
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+	// AggregatorServer的运行依赖于GenericAPIServer，通过c.GenericConfig.New函数创建名为kube-aggregator的服务。
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
@@ -181,6 +182,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
 
+	// AggregatorServer (API聚合服务)通过APIAggregator对象进行管理，实例化该对象后才能注册AggregatorServer下的资源。
 	s := &APIAggregator{
 		GenericAPIServer:           genericServer,
 		delegateHandler:            delegationTarget.UnprotectedHandler(),
@@ -201,7 +203,15 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
+	// APIGroupInfo对象用于描述资源组信息，该对象的VersionedResourcesStorageMap字段用于存储资源与资源存储对象的映射关系，其表现形式为
+	// map[string]map[string]rest.Storage (即<资源版本>/<资源>/<资源存储对象>)，例如apiservices资源与资源存储对象的映射关系是v1/apiservices/apiServiceREST。
+	// AggregatorServer通过apiservicerest.NewRESTStorage函数实例化APIGroupInfo 对象并在内部实现其资源与资源存储对象的映射
 	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter, resourceExpirationEvaluator.ShouldServeForVersion(1, 22))
+
+	// 通过s.GenericAPIServer.InstallAPIGroup 函数将APIGroupInfo 对象中的<资源组>/<资源版本>/<资源>/<子资源> (包括资源存储对象)
+	// 注册到AggregatorServer Handlers函数。其过程是遍历APIGroupInfo, 将<资源组>/<资源版本>/<资源名称>映射到HTTP PATH请求路径，
+	// 通过InstallREST 函数将资源存储对象作为资源的Handlers方法，最后使用go-restful的ws.Route将定义好的请求路径和Handlers方法添加路由到go-restful 中。
+	// 整个过程为InstallAPIGroups → s.installAPIResources → InstallREST，该过程与APIExtensionsServer注册APIGroupInfo的过程类似
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}

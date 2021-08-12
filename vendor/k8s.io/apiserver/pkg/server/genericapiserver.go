@@ -328,6 +328,9 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
+// Run函数是真正实现kube-apiserver启动HTTP服务的函数，并通过stopCh了当前进程
+// 当按下了Crt+tC组合键或发送了kll -15信号时，stopCh 会处于非阻塞状态，此时意味着进程需要退出。
+// 退出之前需要做进程清理操作，例如关闭hook函数，等待当前正在处理的请求完成之后再退出进程。
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := make(chan struct{})
 
@@ -413,6 +416,9 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 
 	s.RunPostStartHooks(stopCh)
 
+	// 早期Linux系统使用initd进程负责Linux的进程管理，后期Systemd取代了initd，成为系统的第一个进程(即PID为1)，其他进程都是它的子进程。
+	// 如果进程被systemd管理，需要向该进程报告当前进程的状态。
+	// systemd.SdNotify用于守护进程向systemd报告进程状态的变化，其中一项是向systemd报告启动已完成的消息(即READY=1)
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
 		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 	}

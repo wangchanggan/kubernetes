@@ -32,9 +32,13 @@ import (
 // Write and other vars are slices of the allowed verbs.
 // Label and Annotation are default maps of bootstrappolicy.
 var (
-	Write      = []string{"create", "update", "patch", "delete", "deletecollection"}
-	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
-	Read       = []string{"get", "list", "watch"}
+	// 只写权限。
+	Write = []string{"create", "update", "patch", "delete", "deletecollection"}
+	// 读/写权限。
+	ReadWrite = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
+	// 只读权限。
+	Read = []string{"get", "list", "watch"}
+	// 读和更新权限。
 	ReadUpdate = []string{"get", "list", "watch", "update", "patch"}
 
 	Label      = map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}
@@ -103,6 +107,8 @@ func addClusterRoleBindingLabel(rolebindings []rbacv1.ClusterRoleBinding) {
 }
 
 // NodeRules returns node policy rules, it is slice of rbacv1.PolicyRule.
+// NodeRules函数定义了system:node内置角色的权限，它拥有许多资源的操作权限
+// 例如Configmap、Secret、 Service、 Pod 等资源。
 func NodeRules() []rbacv1.PolicyRule {
 	nodePolicyRules := []rbacv1.PolicyRule{
 		// Needed to check API access.  These creates are non-mutating
@@ -569,6 +575,10 @@ const systemNodeRoleName = "system:node"
 // ClusterRoleBindings return default rolebindings to the default roles
 func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	rolebindings := []rbacv1.ClusterRoleBinding{
+		// kube-apiserver在启动时会默认创建内置角色。例如cluster-admin集群角色，它拥有Kubernetes的最高权限。
+		// cluster-admin集群角色的定义中将资源类型和非资源类型都设置为通配符(*)，匹配所有资源版本、资源，拥有Kubermetes 的最高控制权限。
+		// 然后将cluster-admin集群角色与system:masters组进行绑定。
+		// 注意：不建议擅自改动内置集群角色及内置权限的定义，因为这样可能会造成Kubernetes系统中的某些组件因权限问题导致不可以被授权。
 		rbacv1helpers.NewClusterBinding("cluster-admin").Groups(user.SystemPrivilegedGroup).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:monitoring").Groups(user.MonitoringGroup).BindingOrDie(),
 		rbacv1helpers.NewClusterBinding("system:discovery").Groups(user.AllAuthenticated).BindingOrDie(),

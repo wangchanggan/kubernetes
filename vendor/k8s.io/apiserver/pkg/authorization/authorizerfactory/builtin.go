@@ -30,10 +30,12 @@ import (
 type alwaysAllowAuthorizer struct{}
 
 func (alwaysAllowAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	// 在进行AlwaysAllow授权时，直接授权成功，返回DecisionAllow决策状态。
 	return authorizer.DecisionAllow, "", nil
 }
 
 func (alwaysAllowAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	// AlwaysAllow的规则解析器会将资源类型的规则列表(ResourceRuleInfo) 和非资源类型的规则列表(NonResourceRuleInfo) 都设置为通配符(*) 匹配所有资源版本、资源及资源操作方法。
 	return []authorizer.ResourceRuleInfo{
 			&authorizer.DefaultResourceRuleInfo{
 				Verbs:     []string{"*"},
@@ -58,10 +60,13 @@ func NewAlwaysAllowAuthorizer() *alwaysAllowAuthorizer {
 type alwaysDenyAuthorizer struct{}
 
 func (alwaysDenyAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+	// 在进行AlwaysDeny授权时，直接返回DecisionNoOpionion决策状态。
+	// 如果存在下一个授权器，会继续执行下一个授权器;如果不存在下一个授权器，则会拒绝所有请求。
 	return authorizer.DecisionNoOpinion, "Everything is forbidden.", nil
 }
 
 func (alwaysDenyAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	// AlwaysDeny的规则解析器会将资源类型的规则列表( ResourceRuleInfo)和非资源类型的规则列表(NonResourceRuleInfo) 都设置为空
 	return []authorizer.ResourceRuleInfo{}, []authorizer.NonResourceRuleInfo{}, false, nil
 }
 

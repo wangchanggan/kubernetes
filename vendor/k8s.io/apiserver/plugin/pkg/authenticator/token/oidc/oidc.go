@@ -531,6 +531,9 @@ func (r *claimResolver) resolve(endpoint endpoint, allClaims claims) error {
 	return nil
 }
 
+// OIDC认证接口定义了AuthenticateToken方法，该方法接收token字符串。
+// 若验证失败，bool 值会为false; 若验证成功，bool 值会为true, 并返回*authenticato.Response
+// *athnticato.Response中携带了身份验证用户的信息，例如Name、UID、Groups、Extra 等信息。
 func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	if !hasCorrectIssuer(a.issuerURL, token) {
 		return nil, false, nil
@@ -541,6 +544,8 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		return nil, false, fmt.Errorf("oidc: authenticator not initialized")
 	}
 
+	// 在进行OIDC认证时，通过veifer.Verify函数验证接收到的id_ token 中的签名是否合法
+	// 如果不合法则认证失败返回false，如果合法则认证成功返回true.
 	idToken, err := verifier.Verify(ctx, token)
 	if err != nil {
 		return nil, false, fmt.Errorf("oidc: verify token: %v", err)

@@ -75,6 +75,8 @@ func (v *authorizingVisitor) visit(source fmt.Stringer, rule *rbacv1.PolicyRule,
 func (r *RBACAuthorizer) Authorize(ctx context.Context, requestAttributes authorizer.Attributes) (authorizer.Decision, string, error) {
 	ruleCheckingVisitor := &authorizingVisitor{requestAttributes: requestAttributes}
 
+	// 在进行RBAC授权时，首先通过rauthorzationRuleResolver.VisitRulesFor函数调用给定的ruleCheckingVisitorvisit函数来验证授权，
+	// 该函数返回的allowed字段为true, 表示授权成功并返回DecisionAllow决策状态。
 	r.authorizationRuleResolver.VisitRulesFor(requestAttributes.GetUser(), requestAttributes.GetNamespace(), ruleCheckingVisitor.visit)
 	if ruleCheckingVisitor.allowed {
 		return authorizer.DecisionAllow, ruleCheckingVisitor.reason, nil

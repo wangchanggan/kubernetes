@@ -189,6 +189,8 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	if err != nil {
 		return w.decisionOnError, "", err
 	}
+
+	// 在进行Webhook授权时，首先通过w.responseCache.Get函数从缓存中查找是否已有缓存的授权，如果有则直接使用该状态(Status)
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorizationv1.SubjectAccessReviewStatus)
 	} else {
@@ -196,6 +198,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		// WithExponentialBackoff will return SAR create error (sarErr) if any.
 		if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 			var sarErr error
+			// 如果没有则通过 w.subjectAccessReview.Create( RESTClient)从远程的Webhook服务器获取授权验证，该函数发送Post请求，并在请求体(Body)中携带授权信息。
 			result, sarErr = w.subjectAccessReview.Create(ctx, r, metav1.CreateOptions{})
 			return sarErr
 		}, webhook.DefaultShouldRetry); err != nil {
@@ -218,6 +221,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	case r.Status.Denied:
 		return authorizer.DecisionDeny, r.Status.Reason, nil
 	case r.Status.Allowed:
+		// 在验证Webhook服务器授权之后，返回的Status.Allowed字段为true, 表示授权成功并返回DecisionAllow 决策状态。
 		return authorizer.DecisionAllow, r.Status.Reason, nil
 	default:
 		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
@@ -232,6 +236,8 @@ func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]author
 		nonResourceRules []authorizer.NonResourceRuleInfo
 	)
 	incomplete := true
+	// Webhook的规则解析器不支持规则列表解析，因为规则是由远程的Webhook服务端进行授权的。
+	// 所以Webhook的规则解析器的资源类型的规则列表( ResourceRuleInfo)和非资源类型的规则列表(NonResourceRuleInfo)都会被设置为空。
 	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
 }
 

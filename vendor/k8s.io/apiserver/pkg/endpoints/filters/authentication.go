@@ -42,7 +42,9 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 	return withAuthentication(handler, auth, failed, apiAuds, recordAuthMetrics)
 }
 
+// WithAuthentication函数可以作为kube-apiserver 的认证 Handler函数。
 func withAuthentication(handler http.Handler, auth authenticator.Request, failed http.Handler, apiAuds authenticator.Audiences, metrics recordMetrics) http.Handler {
+	// 如果 auth 认证器为空，说明 kube-apiserver 未启用任何认证功能
 	if auth == nil {
 		klog.Warning("Authentication is disabled")
 		return handler
@@ -53,6 +55,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		if len(apiAuds) > 0 {
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
+		// 如果其不为空，则通过auth.AuthenticateRequest 函数对请求进行认证。
 		resp, ok, err := auth.AuthenticateRequest(req)
 		authenticationFinish := time.Now()
 		defer func() {
@@ -62,6 +65,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 			if err != nil {
 				klog.ErrorS(err, "Unable to authenticate the request")
 			}
+			// 如果身份认证失败，则通过failed.ServeHTTP函数返回HTTP 401 Unauthorized，表示认证被拒绝;
 			failed.ServeHTTP(w, req)
 			return
 		}
@@ -74,6 +78,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		}
 
 		// authorization header is not required anymore in case of a successful authentication.
+		// 如果身份认证成功,则不再需要Authorization请求头并进入授权阶段。
 		req.Header.Del("Authorization")
 
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))

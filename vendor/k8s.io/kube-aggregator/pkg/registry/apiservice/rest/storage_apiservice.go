@@ -34,8 +34,13 @@ import (
 func NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, shouldServeBeta bool) genericapiserver.APIGroupInfo {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiregistration.GroupName, aggregatorscheme.Scheme, metav1.ParameterCodec, aggregatorscheme.Codecs)
 
+	// AggregatorServer会先判断 apiregistration.k8s.io/v1 资源组/资源版本是否已启用，
+	// 如果其已启用，则将该资源组/资源版本下的资源与资源存储对象进行映射，并将其存储至APIGroupInfo对象的VersionedResourcesStorageMap 字段中。
 	if shouldServeBeta && apiResourceConfigSource.VersionEnabled(v1beta1.SchemeGroupVersion) {
 		storage := map[string]rest.Storage{}
+		// 每个资源(包括子资源)都通过类似于NewREST的函数创建资源存储对象(即RESTStorage )。
+		// kube-apiserver将RESTStorage封装成HTTP Handler方法，资源存储对象以RESTful的方式运行，一个RESTStorage对象负责一个资源的增、删、改、查操作。
+		// 当操作apiservices 资源数据时，通过对应的RESTStorage资源存储对象与genericregistry.Store进行交互。
 		apiServiceREST := apiservicestorage.NewREST(aggregatorscheme.Scheme, restOptionsGetter)
 		storage["apiservices"] = apiServiceREST
 		storage["apiservices/status"] = apiservicestorage.NewStatusREST(aggregatorscheme.Scheme, apiServiceREST)

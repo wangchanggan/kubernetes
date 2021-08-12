@@ -56,6 +56,10 @@ func Register(plugins *admission.Plugins) {
 }
 
 // Plugin is an implementation of admission.Interface.
+// PodNodeSelector准入控制器通过读取命名空间注释和准入控制器配置文件来限制Pod资源对象可在命名空间内使用的节点选择器。
+// PodNodeSelector准入控制器会对拦截的kube-apiserver请求中的Pod资源对象进行修改，将节点选择器与Pod资源对象的节点选择器进行合并，
+// 并赋值给Pod资源对象的节点选择器(即pod.Spec.NodeSelectore)。
+// Pod资源对象的节点选择器(即pod.Spec.NodeSelector)必须为true，才能使Pod资源对象选择到合适的节点。
 type Plugin struct {
 	*admission.Handler
 	client          kubernetes.Interface
@@ -98,20 +102,30 @@ func readConfig(config io.Reader) *pluginConfig {
 
 // Admit enforces that pod and its namespace node label selectors matches at least a node in the cluster.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	// PodNodeSelector准入控制器在执行变更操作时，shouldIgnore函数会忽略Pod以外的资源对象，因为PodNodeSelector 准入控制器只对Pod资源对象有效。
 	if shouldIgnore(a) {
 		return nil
 	}
+
+	// 通过p.WaitForReady函数判断该准入控制器是否已完成初始化
 	if !p.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
 	resource := a.GetResource().GroupResource()
 	pod := a.GetObject().(*api.Pod)
+
+	// 通过p.getNamespaceNodeSelectorMap函数选择节点选择器(namespaceNodeSelector)，它是通过读取命名空间注释和配置文件来选择节点选择器的。其执行过程如下：
+	// 如果命名空间中具有带键的注释(即scheduler.alpha.kubernetes.io/node-selector)，则将其值用作节点选择器。
+	// 如果命名空间中没有这样的注释(即scheduler.alpha.kubernetes.io/node-selector)，则使用准入控制器配置文件中定义的clusterDefaultNodeSelector作为节点选择器。
 	namespaceNodeSelector, err := p.getNamespaceNodeSelectorMap(a.GetNamespace())
 	if err != nil {
 		return err
 	}
 
+	// 通过labels.Conflicts函数判断节点选择器与资源对象的节点选择器是否存在冲突。
+	// 如果存在冲突，则通过errors.NewForbidden函数返回HTTP 403 Forbidden
+	// 如果不存在冲突，最后通过labels.Merge函数将节点选择器与资源对象的节点选择器进行合并，并赋值给Pod资源对象的节点选择器(即pod.Spec.NodeSelectore)。
 	if labels.Conflicts(namespaceNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
 		return errors.NewForbidden(resource, pod.Name, fmt.Errorf("pod node label selector conflicts with its namespace node label selector"))
 	}
@@ -124,6 +138,8 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 }
 
 // Validate ensures that the pod node selector is allowed
+// 在进行PodNodeSelector准入控制器验证时，验证pod.Spec.NodeSelector资源对象的节点选择器是否与准入控制器配置文件中定义的节点选择器存在冲突，
+// 如果返回false,则通过errors.NewForbidden函数返回HTTP 403 Forbidden。
 func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil

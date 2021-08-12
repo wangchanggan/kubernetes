@@ -227,6 +227,7 @@ func resourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 // Authorize implements authorizer.Authorize
 func (pl PolicyList) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	for _, p := range pl {
+		// 在进行ABAC授权时，遍历所有的策略，通过matches函数进行匹配，如果授权成功，返回DecisionAllow决策状态。
 		if matches(*p, a) {
 			return authorizer.DecisionAllow, "", nil
 		}
@@ -247,6 +248,7 @@ func (pl PolicyList) RulesFor(user user.Info, namespace string) ([]authorizer.Re
 	for _, p := range pl {
 		if subjectMatches(*p, user) {
 			if p.Spec.Namespace == "*" || p.Spec.Namespace == namespace {
+				// ABAC的规则解析器会根据每一个策略将资源类型的规则列表( ResourceRuleInfo)和非资源类型的规则列表(NonResourceRuleInfo)都设置为该用户有权限操作的资源版本、资源及资源操作方法。
 				if len(p.Spec.Resource) > 0 {
 					r := authorizer.DefaultResourceRuleInfo{
 						Verbs:     getVerbs(p.Spec.Readonly),

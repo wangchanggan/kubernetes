@@ -30,6 +30,10 @@ var shutdownHandler chan os.Signal
 // is terminated with exit code 1.
 // Only one of SetupSignalContext and SetupSignalHandler should be called, and only can
 // be called once.
+// 在kube-apisever组件的main函数中，首先执行SetupSignalHandler函数，它通过signalNotify函数监控osInterrupt和syscall.SIGTERM信号将监控的信号与stop chan绑定。
+// stop chan返回值被Run函数所调用。
+// 在kube-apiserver组件未触发这两个信号时，stop chan处于阻塞状态(即实现了常驻进程)
+// 当按下了CtrI+C组合键或发送了kill -15信号时，stop chan处于非阻塞状态(即实现了进程退出)。
 func SetupSignalHandler() <-chan struct{} {
 	return SetupSignalContext().Done()
 }

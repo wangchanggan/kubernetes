@@ -59,8 +59,11 @@ var _ admission.MutationInterface = &AlwaysPullImages{}
 var _ admission.ValidationInterface = &AlwaysPullImages{}
 
 // Admit makes an admission decision based on the request attributes
+// AlwaysPullImages准入控制器在创建新的容器之前更新最新镜像。
+// 对拦截的kube-apiserver请求中的Pod资源对象进行修改，将Pod资源对象的镜像拉取策略改为Always。
 func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
+	// AlwaysPullImages准入控制器在执行变更操作时，shouldIgnore函数会忽略Pod以外的资源对象，因为AlwaysPullImages准入控制器只对Pod资源对象有效。
 	if shouldIgnore(attributes) {
 		return nil
 	}
@@ -69,6 +72,7 @@ func (a *AlwaysPullImages) Admit(ctx context.Context, attributes admission.Attri
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
+	// 将当前Pod资源对象的InitContainers和Containers的拉取策略都改为Always，这样在创建新的容器之前实现了更新最新镜像。
 	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, _ *field.Path) bool {
 		c.ImagePullPolicy = api.PullAlways
 		return true
@@ -89,6 +93,8 @@ func (*AlwaysPullImages) Validate(ctx context.Context, attributes admission.Attr
 	}
 
 	var allErrs []error
+	// AlwaysPullImages准入控制器在执行验证操作时，确保所有容器的拉取策略都被设置为Always
+	// 如果未能将拉取策略全部设置为Always，则通过 admission.NewForbidden函数返回HTTP 403 Forbidden。
 	pods.VisitContainersWithPath(&pod.Spec, field.NewPath("spec"), func(c *api.Container, p *field.Path) bool {
 		if c.ImagePullPolicy != api.PullAlways {
 			allErrs = append(allErrs, admission.NewForbidden(attributes,

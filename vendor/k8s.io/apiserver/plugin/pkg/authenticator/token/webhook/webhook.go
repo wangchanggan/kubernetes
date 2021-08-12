@@ -109,6 +109,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	// WithExponentialBackoff will return tokenreview create error (tokenReviewErr) if any.
 	if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 		var tokenReviewErr error
+		// 请求远程的Webhook服务器，通过w.tokenReview.Create (RESTClient)函数发送Post请求，并在请求体(Body)中携带认证信息。
 		result, tokenReviewErr = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
 		return tokenReviewErr
 	}, webhook.DefaultShouldRetry); err != nil {
@@ -129,6 +130,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	}
 
 	r.Status = result.Status
+	// 在验证Webhook服务器认证之后，返回的Status.Authenticated 字段为true, 表示认证成功。
 	if !r.Status.Authenticated {
 		var err error
 		if len(r.Status.Error) != 0 {

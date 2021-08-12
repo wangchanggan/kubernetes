@@ -67,7 +67,11 @@ type Attributes interface {
 // Authorizer makes an authorization decision based on information gained by making
 // zero or more calls to methods of the Attributes interface.  It returns nil when an action is
 // authorized, otherwise it returns an error.
+// 每一种授权机制都需要实现 authorizer.Authorizer 授权器接口方法、接口定义
 type Authorizer interface {
+	// Authorizer接口定义了Authorize方法，每个授权器都需要实现该方法，该方法会接收一个Attributes参数。
+	// Attributes 是决定授权器从HTTP请求中获取授权信息方法的参数，例如GetUser、GetVerb、 GetNamespace、 GetResource 等获取授权信息方法。
+	// 如果授权成功，Decision 决策状态变为DecisionAllow;如果授权失败，Decision 决策状态变为DecisionDeny，并返回授权失败的原因。
 	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
 }
 
@@ -78,8 +82,13 @@ func (f AuthorizerFunc) Authorize(ctx context.Context, a Attributes) (Decision, 
 }
 
 // RuleResolver provides a mechanism for resolving the list of rules that apply to a given user within a namespace.
+// 授权器通过RuleResolver规则解析器去解析规则
 type RuleResolver interface {
 	// RulesFor get the list of cluster wide rules, the list of rules in the specific namespace, incomplete status and errors.
+	// RuleResolver接口定义了RulesFor方法，每个授权器都需要实现该方法，RulesFor方法通过接收的user用户信息及namespace命名空间参数，解析出规则列表并返回。
+	// 规则列表分为如下两种：
+	// ResourceRuleInfo：资源类型的规则列表，例如/api/v1/pods的资源接口。
+	// NonResourceRuleInfo：非资源类型的规则列表，例如/api或/health的资源接口。
 	RulesFor(user user.Info, namespace string) ([]ResourceRuleInfo, []NonResourceRuleInfo, bool, error)
 }
 
@@ -146,14 +155,19 @@ func (a AttributesRecord) GetPath() string {
 	return a.Path
 }
 
+// Decision决策状态类似于认证中的true和false，用于决定是否授权成功。
+// 授权支持3种Decision决策状态，例如授权成功，则返回DecisionAllow决策状态。
 type Decision int
 
 const (
 	// DecisionDeny means that an authorizer decided to deny the action.
+	// 表示授权器拒绝该操作。
 	DecisionDeny Decision = iota
 	// DecisionAllow means that an authorizer decided to allow the action.
+	// 表示授权器允许该操作。
 	DecisionAllow
 	// DecisionNoOpionion means that an authorizer has no opinion on whether
 	// to allow or deny an action.
+	// 表示授权器对是否允许或会继续执行下一个授权器。
 	DecisionNoOpinion
 )

@@ -29,6 +29,9 @@ const (
 	unauthenticatedGroup = user.AllUnauthenticated
 )
 
+// Anonymous认证接口定义了AuthenticateRequest方法，该方法接收客户端请求。
+// 若验证失败，bool 值会为false; 若验证成功，bool值会为true，并返回 *authenticator.Response
+// *authenticator.Response 中携带了身份验证用户的信息，例如 Name、UID、Groups、Extra 等信息。
 func NewAuthenticator() authenticator.Request {
 	return authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		auds, _ := authenticator.AudiencesFrom(req.Context())

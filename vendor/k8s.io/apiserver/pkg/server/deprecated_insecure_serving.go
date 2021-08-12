@@ -42,8 +42,11 @@ type DeprecatedInsecureServingInfo struct {
 // the initial listen call fails. It does not block.
 func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error {
 	insecureServer := &http.Server{
-		Addr:           s.Listener.Addr().String(),
-		Handler:        handler,
+		// 在自定义的htp.Server结构体中，Addr 字段用于配置监控地址与端口，该地址与端口来自用户命令行参数--insecure-bind-address和--insecure-port参数)
+		Addr: s.Listener.Addr().String(),
+		// Handler 字段用于配置Handler函数
+		Handler: handler,
+		// MaxHeaderBytes 字段用于配置请求头的最大字节数
 		MaxHeaderBytes: 1 << 20,
 	}
 

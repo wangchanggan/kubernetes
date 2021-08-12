@@ -89,7 +89,11 @@ func tokenErrorf(s *corev1.Secret, format string, i ...interface{}) {
 //
 //     ( token-id ).( token-secret )
 //
+// BootstrapToken认证接口定义了AuthenticateToken方法，该方法接收token字符串。
+// 若验证失败，bool 值会为false; 若验证成功，bool 值会为true, 并返回*authenticator.Response
+// *authenticator.Response 中携带了身份验证用户的信息，例如Name、UID、Groups、Extra 等信息。
 func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	// 在进行BootstrapToken认证时，通过paseToken函数解析出Token ID和Token Secret
 	tokenID, tokenSecret, err := bootstraptokenutil.ParseToken(token)
 	if err != nil {
 		// Token isn't of the correct form, ignore it.
@@ -128,6 +132,7 @@ func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string
 		return nil, false, nil
 	}
 
+	// 验证Token Secret中的Expire (过期)、Data、Type等，认证失败会返回false，而认证成功会返回true
 	if bootstrapsecretutil.HasExpired(secret, time.Now()) {
 		// logging done in isSecretExpired method.
 		return nil, false, nil

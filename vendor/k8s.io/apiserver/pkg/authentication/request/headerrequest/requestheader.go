@@ -154,12 +154,18 @@ func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, 
 	return x509request.NewDynamicCAVerifier(verifyOptionFn, headerAuthenticator, proxyClientNames)
 }
 
+// RequestHeader认证接口定义了AuthenticateRequest 方法，该方法接收客户端请求。
+// 若验证失败，bool 值会为false; 若验证成功，bool 值会为true, 并返回*authenticator. Response
+// *authenticator.Response 中携带了身份验证用户的信息，例如Name、UID、Groups、 Extra 等信息。
 func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+	// 在进行RequestHeader认证时，通过headerValue函数从请求头中读取所有的用户信息
 	name := headerValue(req.Header, a.nameHeaders.Value())
 	if len(name) == 0 {
 		return nil, false, nil
 	}
+	// 通过allHeaderValues函数读取所有组的信息
 	groups := allHeaderValues(req.Header, a.groupHeaders.Value())
+	// 通过newExtra函数读取所有额外的信息
 	extra := newExtra(req.Header, a.extraHeaderPrefixes.Value())
 
 	// clear headers used for authentication
@@ -175,6 +181,7 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 		}
 	}
 
+	// 当用户名无法匹配时，则认证失败返回false,反之则认证成功返回true。
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   name,

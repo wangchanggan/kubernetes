@@ -144,7 +144,7 @@ cluster's shared state through which all other components interact.`,
 				return utilerrors.NewAggregate(errs)
 			}
 
-			// // 将completedOptions(kube-apiserver 组件的运行配置)对象传入Run函数，Run函数定义了kube-apiserver组件启动的逻辑，它是一个运行不退出的常驻进程。
+			// 将completedOptions(kube-apiserver 组件的运行配置)对象传入Run函数，Run函数定义了kube-apiserver组件启动的逻辑，它是一个运行不退出的常驻进程。
 			return Run(completedOptions, genericapiserver.SetupSignalHandler())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {

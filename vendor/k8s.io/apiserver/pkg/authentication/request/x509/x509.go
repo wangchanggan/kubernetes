@@ -195,6 +195,9 @@ func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.R
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
+// ClientCA认证接口定义了AuthenticateRequest方法，该方法接收客户端请求。
+// 若验证失败，bool值会为false; 若验证成功，bool 值会为true,并返回*authenticator.Response,
+// *authenicator.Response中携带了身份验证用户的信息，例如Name、UID、Groups、Extra 等信息。
 func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
@@ -213,6 +216,8 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 		}
 	}
 
+	// 在进行ClientCA认证时，通过 req.TLS.PeerCertificates[0].Verify验证证书，
+	// 如果是CA签名过的证书，都可以通过验证，认证失败会返回false, 而认证成功会返回true。
 	if _, err := req.TLS.PeerCertificates[0].Verify(optsCopy); err != nil {
 		return nil, false, err
 	}

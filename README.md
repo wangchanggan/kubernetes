@@ -4,6 +4,93 @@ Source Code From https://github.com/kubernetes/kubernetes/releases/tag/v1.21.0
 
 参考Kubernetes源码分析（基于Kubernetes 1.14版本）（郑东旭/著）
 
+## 目录
+-   [Kubernetes源码分析](#kubernetes源码分析)
+    -   [目录](#目录)
+    -   [源码目录结构说明](#源码目录结构说明)
+    -   [架构](#架构)
+    -   [核心数据结构](#核心数据结构)
+        -   [APIResourceList](#apiresourcelist)
+        -   [Group](#group)
+        -   [Version](#version)
+        -   [Resource](#resource)
+            -   [资源外部版本与内部版本](#资源外部版本与内部版本)
+            -   [资源代码定义](#资源代码定义)
+            -   [资源注册到资源注册表](#资源注册到资源注册表)
+            -   [资源首选版本](#资源首选版本)
+            -   [资源操作方法](#资源操作方法)
+            -   [资源与命名空间](#资源与命名空间)
+        -   [runtime.Object类型基石](#runtime.object类型基石)
+        -   [Unstructured数据](#unstructured数据)
+        -   [Scheme资源注册表](#scheme资源注册表)
+            -   [Scheme资源注册表数据结构](#scheme资源注册表数据结构)
+            -   [资源注册表注册方法](#资源注册表注册方法)
+        -   [Codec编解码器](#codec编解码器)
+            -   [Codec编解码实例化](#codec编解码实例化)
+            -   [jsonSerializer与yamlSerializer序列化器](#jsonserializer与yamlserializer序列化器)
+            -   [protobufSerializer序列号器](#protobufserializer序列号器)
+        -   [Converter资源版本转换器](#converter资源版本转换器)
+            -   [Converter转换器数据结构](#converter转换器数据结构)
+            -   [Converter注册转换函数](#converter注册转换函数)
+            -   [Converter资源版本转换原理](#converter资源版本转换原理)
+    -   [kubectl命令行交互](#kubectl命令行交互)
+        -   [创建资源对象的过程](#创建资源对象的过程)
+            -   [实例化Factory接口](#实例化factory接口)
+            -   [Builder构建资源对象](#builder构建资源对象)
+            -   [Visitor多层匿名函数嵌套](#visitor多层匿名函数嵌套)
+    -   [client-go编程式交互](#client-go编程式交互)
+    -   [Etcd存储核心实现](#etcd存储核心实现)
+        -   [RegistryStore存储服务通用操作](#registrystore存储服务通用操作)
+        -   [Storage.Interface通用存储接口](#storage.interface通用存储接口)
+        -   [CacherStorage缓存层](#cacherstorage缓存层)
+            -   [CacherStorage缓存层设计](#cacherstorage缓存层设计)
+            -   [watchCache 缓存滑动窗口](#watchcache-缓存滑动窗口)
+        -   [UnderlyingStorage底层存储对象](#underlyingstorage底层存储对象)
+        -   [Codec编解码数据](#codec编解码数据)
+        -   [Strategy预处理](#strategy预处理)
+            -   [创建资源对象时的预处理操作](#创建资源对象时的预处理操作)
+            -   [更新资源对象时的预处理操作](#更新资源对象时的预处理操作)
+            -   [删除资源对象时的预处理操作](#删除资源对象时的预处理操作)
+    -   [kube-apiserver核心实现](#kube-apiserver核心实现)
+        -   [热身概念](#热身概念)
+            -   [go-restful核心原理](#go-restful核心原理)
+            -   [OpenAPI/Swagger核心原理](#openapiswagger核心原理)
+            -   [gRPC核心原理](#grpc核心原理)
+        -   [kube-apiserver启动流程](#kube-apiserver启动流程)
+            -   [资源注册](#资源注册)
+            -   [Cobra命令行参数解析](#cobra命令行参数解析)
+            -   [创建APIServer通用配置](#创建apiserver通用配置)
+            -   [创建APIExtensionsServer](#创建apiextensionsserver)
+            -   [创建KubeAPIServer](#创建kubeapiserver)
+            -   [创建AggregatorServer](#创建aggregatorserver)
+            -   [创建GenericAPIServer（以创建APIExtensionsSever为例）](#创建genericapiserver以创建apiextensionssever为例)
+            -   [启动HTTP服务](#启动http服务)
+            -   [启动HTTPS服务](#启动https服务)
+        -   [认证](#认证)
+            -   [BasicAuth认证](#basicauth认证)
+            -   [ClientCA认证](#clientca认证)
+            -   [TokenAuth认证](#tokenauth认证)
+            -   [BootstrapToken认证](#bootstraptoken认证)
+            -   [RequestHeader认证](#requestheader认证)
+            -   [Webhook TokenAuth认证](#webhook-tokenauth认证)
+            -   [Anonymous认证](#anonymous认证)
+            -   [OIDC认证](#oidc认证)
+            -   [ServiceAccountAuth认证](#serviceaccountauth认证)
+        -   [授权](#授权)
+            -   [AlwaysAllow授权](#alwaysallow授权)
+            -   [AlwaysDeny授权](#alwaysdeny授权)
+            -   [ABAC授权](#abac授权)
+            -   [Webhook授权](#webhook授权)
+            -   [RBAC授权](#rbac授权)
+            -   [Node授权](#node授权)
+        -   [准入控制器](#准入控制器)
+            -   [AlwaysPullImages准入控制器](#alwayspullimages准入控制器)
+            -   [PodNodeSelector准入控制器](#podnodeselector准入控制器)
+        -   [进程信号处理机制](#进程信号处理机制)
+            -   [常驻进程实现](#常驻进程实现)
+            -   [进程的优雅关闭](#进程的优雅关闭)
+            -   [向systemd报告进程状态](#向systemd报告进程状态)
+
 ## 源码目录结构说明
 | 源码目录 | 说明 | 备注 |
 | :----: | :---- | :---- |
@@ -386,4 +473,121 @@ vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/apiserver.go:185
 
 vendor/k8s.io/apiserver/pkg/endpoints/groupversion.go:109
 
+#### 创建KubeAPIServer
+1.创建GenericAPIServer pkg/controlplane/instance.go:355
+
+2.实例化Master pkg/controlplane/instance.go:396
+
+3.InstallLegacyAPI注册/api资源 pkg/controlplane/instance.go:403,546
+
+4.InstallAPIs注册/apis资源 pkg/controlplane/instance.go:592
+
+#### 创建AggregatorServer
+1.创建GenericAPIServer vendor/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:171
+
+2.实例化APIAggregator vendor/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:186
+
+3.实例化APIGroupInfo
+
+vendor/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:209
+
+vendor/k8s.io/kube-aggregator/pkg/registry/apiservice/rest/storage_apiservice.go:34
+
+4.installAPIGroup注册APIGroup vendor/k8s.io/kube-aggregator/pkg/apiserver/apiserver.go:215
+
+#### 创建GenericAPIServer（以创建APIExtensionsSever为例）
+vendor/k8s.io/apiserver/pkg/server/handler.go:73
+
+#### 启动HTTP服务
+vendor/k8s.io/apiserver/pkg/server/deprecated_insecure_serving.go:43
+
+vendor/k8s.io/apiserver/pkg/server/secure_serving.go:207
+
+#### 启动HTTPS服务
+vendor/k8s.io/apiserver/pkg/server/secure_serving.go:147
+
+
+### 认证
+vendor/k8s.io/apiserver/pkg/endpoints/filters/authentication.go:46
+
+vendor/k8s.io/apiserver/pkg/authentication/request/union/union.go:54
+
+#### BasicAuth认证
+通过go语言标准库实现 $GOROOT/src/net/http/request.go:922
+
+#### ClientCA认证
+vendor/k8s.io/apiserver/pkg/authentication/request/x509/x509.go:201
+
+#### TokenAuth认证
+vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest/tokentest.go:39
+
+#### BootstrapToken认证
+plugin/pkg/auth/authenticator/token/bootstrap/bootstrap.go:95
+
+#### RequestHeader认证
+vendor/k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader.go:160
+
+#### Webhook TokenAuth认证
+vendor/k8s.io/apiserver/pkg/authentication/token/cache/cached_token_authenticator.go:127,138
+
+vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook/webhook.go:86
+
+#### Anonymous认证
+vendor/k8s.io/apiserver/pkg/authentication/request/anonymous/anonymous.go:35
+
+#### OIDC认证
+vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go:537
+
+#### ServiceAccountAuth认证
+pkg/serviceaccount/jwt.go:261
+
+### 授权
+vendor/k8s.io/apiserver/pkg/authorization/authorizer/interfaces.go
+
+#### AlwaysAllow授权
+vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory/builtin.go:32,,37
+
+#### AlwaysDeny授权
+vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory/builtin.go:62,68
+
+#### ABAC授权
+pkg/auth/authorizer/abac/abac.go:228,242
+
+#### Webhook授权
+vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook/webhook.go:161,233
+
+#### RBAC授权
+1.RBAC授权详解
+
+examples\rbac.go
+
+plugin/pkg/auth/authorizer/rbac/rbac.go:75
+
+2.内置集群角色
+plugin/pkg/auth/authorizer/rbac/bootstrappolicy/policy.go:34，580
+
+#### Node授权
+plugin/pkg/auth/authorizer/node/node_authorizer.go:94
+
+### 准入控制器
+vendor/k8s.io/apiserver/pkg/admission/interfaces.go:129
+
+vendor/k8s.io/apiserver/pkg/admission/chain.go:247,36,53
+
+#### AlwaysPullImages准入控制器
+plugin/pkg/admission/alwayspullimages/admission.go:64,85
+
+#### PodNodeSelector准入控制器
+plugin/pkg/admission/podnodeselector/admission.go:63,104,143
+
+
+### 进程信号处理机制
+#### 常驻进程实现
+vendor/k8s.io/apiserver/pkg/server/signal.go:37
+
+#### 进程的优雅关闭
+vendor/k8s.io/apiserver/pkg/server/genericapiserver.go:334
+
+#### 向systemd报告进程状态
+vendor/k8s.io/apiserver/pkg/server/genericapiserver.go:422
 

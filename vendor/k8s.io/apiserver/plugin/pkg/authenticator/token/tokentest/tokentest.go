@@ -33,7 +33,12 @@ func New() *TokenAuthenticator {
 	}
 }
 
+// Token认证接口定义了AuthenticateToken 方法，该方法接收token字符串。
+// 若验证失败，bool 值会为false; 若验证成功，bool 值会为true, 并返回*authenticator.Response,
+// *authenticator.Response中携带了身份验证用户的信息，例如Name、UID、Groups、Extra 等信息。
 func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
+	//在进行Token认证时，a.tokens 中存储了服务端的Token列表，通过a.tokens查询客户端提供的Token
+	// 如果查询不到，则认证失败返回false, 反之则认证成功返回true。
 	user, ok := a.Tokens[value]
 	if !ok {
 		return nil, false, nil

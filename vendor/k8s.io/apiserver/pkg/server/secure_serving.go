@@ -149,6 +149,8 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		return nil, fmt.Errorf("listener must not be nil")
 	}
 
+	// HTTPS服务在http.Server上增加了TLSConfig配置，TLSConfig 用于配置相关证书，
+	// 可以通过命令行相关参数(--client-ca-file、--tls-private-key-file、--tls-cert-file参数)进行配置。
 	tlsConfig, err := s.tlsConfig(stopCh)
 	if err != nil {
 		return nil, err
@@ -220,6 +222,9 @@ func RunServer(
 		defer close(stoppedCh)
 		<-stopCh
 		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
+		// 在Kubernetes API Server的代码中还实现了平滑关闭HTTP服务的功能，利用Go语言标准库的HTTP Server.Shutdown函数可以在不干扰任何活跃连接的情况下关闭服务。
+		// 其原理是，首先关闭所有的监听listener, 然后关闭所有的空闲连接，接着无限期地等待所有连接变成空闲状态并关闭。
+		// 如果设置带有超时的Context,将在HTTP服务关闭之前返回Context超时错误。
 		server.Shutdown(ctx)
 		cancel()
 	}()
@@ -233,6 +238,8 @@ func RunServer(
 			listener = tls.NewListener(listener, server.TLSConfig)
 		}
 
+		// 在RunServer函数中，通过Go语言标准库的server.Serve监听listener，并在运行过程中为每个连接创建一个 goroutine
+		// goroutine 读取请求，然后调用Handler函数来处理并响应请求
 		err := server.Serve(listener)
 
 		msg := fmt.Sprintf("Stopped listening on %s", ln.Addr().String())
