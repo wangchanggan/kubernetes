@@ -37,11 +37,16 @@ import (
 )
 
 // NodeScoreList declares a list of nodes and their scores.
+// NodeScoreList结构体是记录节点分数的列表
 type NodeScoreList []NodeScore
 
 // NodeScore is a struct with node name and score.
+// 优选调度算法为每一个可用节点计算出一个最终分数，kube-scheduler调度器会将分数最高的节点作为运行Pod 资源对象的节点。
+// 每个节点的分数可通 NodeScore 进行描述
 type NodeScore struct {
-	Name  string
+	// 节点名称
+	Name string
+	// 节点分数
 	Score int64
 }
 

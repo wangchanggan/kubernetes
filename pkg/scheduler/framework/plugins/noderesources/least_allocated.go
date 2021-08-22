@@ -90,6 +90,10 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plu
 	}, nil
 }
 
+// leastResourceScorer优选调度算法会计算Pod资源对象所需的CPU和内存占当前节点可用资源的百分比，百分比最小的节点最优，它的默认权重值为1。
+// 其计算公式为:
+// (cpu((capacity - sum(requested)) * 10/capacity) + memory((capacity -sum(requested)) * 10/eapacity)) / 2
+// 即(cpu(总资源-已使用资源) * 10/总资源 + memory(总资源-已使用资源) * 10/总资源)/2
 func leastResourceScorer(resToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
 	return func(requested, allocable resourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
 		var nodeScore, weightSum int64

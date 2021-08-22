@@ -62,6 +62,7 @@ type Option func(runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
+	// 首先kube-scheduler组件通过options.NewOptions函数初始化各个模块的默认配置，例如HTTP或HTTPS服务等。
 	opts, err := options.NewOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -78,6 +79,9 @@ kube-scheduler is the reference implementation.
 See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			// 通过Validate函数验证配置参数的合法性和可用性
+			// 通过Complete函数填充默认的options配置参数。
+			// 最后将cmd(kube-scheduler组件的运行配置)对象传入Run函数，Run函数定义了kube-scheduler组件启动的逻辑，它是一个运行不退出的常驻进程。
 			if err := runCommand(cmd, opts, registryOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
@@ -145,6 +149,13 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Prepare the event broadcaster.
+	// Kubernetes的事件(Event) 是一种资源对象 (Resource Object)，用于展示集群内发生的情况
+	// kube-scheduler组件会将运行时产生的各种事件上报给Kubermetes APIServer。
+	// 例如，调度器做了什么决定，为什么从节点中驱逐某些Pod资源对象等。
+	// 可以通过kubectl get event或kubctl describe pod <podname>命令显示事件，用于查看Kubernetes集群中发生了哪些事件
+	// 这些命令只会显示最近(1小时内)发生的事件。
+
+	// 通过StartRecordingToSink自定义函数将关键性事件上报给Kubernetes API Server.
 	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
 
 	// Setup healthz checks.
@@ -192,24 +203,32 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	cc.InformerFactory.Start(ctx.Done())
 
 	// Wait for all caches to sync before scheduling.
+	// 在正式启动Scheduler调度器之前，须通过cc.InformerFactory.WaitForCacheSync函数等待所有运行中的Informer 的数据同步，
+	// 使本地缓存数据与Eted集群中的数据保持一致
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
+		// 领导者选举机制的目的是实现Kubernetes组件的高可用(High Availability)。
+		// 在领导者选举实例化的过程中，会定义Callbacks函数
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
+			// OnStartedLeading函数是当前节点领导者选举成功后回调的函数，该函数定义了kube-scheduler组件的主逻辑
 			OnStartedLeading: func(ctx context.Context) {
 				close(waitingForLeader)
 				sched.Run(ctx)
 			},
+			// OnStoppedLeading函数是当前节点领导者被抢占后回调的函数，在领导者被抢占后，会退出当前的kube-scheduler进程
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
 			},
 		}
+		// 通过leaderelection.NewLeaderElector函数实例化leaderElector对象
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
 		if err != nil {
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}
 
+		// 通过leaderElector.Run函数参与领导者选举，该函数会一直尝试使节点成为领导者。
 		leaderElector.Run(ctx)
 
 		return fmt.Errorf("lost lease")
@@ -319,7 +338,17 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	recorderFactory := getRecorderFactory(&cc)
 	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
+	// Scheduler对象是运行kube-scheduler组件的主对象，它包含了kube-scheduler组件运行过程中的所有依赖模块对象。
+	// Scheduler 对象的实例化过程可分为3部分：
+	// 第1部分，实例化所有的Informer;
+	// 第2部分，实例化调度算法函数;
+	// 第3部分，为所有Informer对象添加对资源事件的监控。
 	sched, err := scheduler.New(cc.Client,
+		// kube-scheduler组件依赖于多个资源的Informer 对象，用于监控相应资源对象的事件。
+		// 例如，通过PodInformer监控Pod资源对象，当某个Pod被创建时，kube-scheduler组件监控到该事件并为该Pod根据调度算法选择出合适的节点(Node)。
+		// 在Scheduler 对象的实例化过程中，对NodeInformer、PodInformer、PersistentVolumeInformer、
+		// PersistentVolumeClaimInformer、ReplicationControllerInformer、ReplicaSetInformer、
+		// StatefulSetInformer、ServiceInformer、PodDisruptionBudgetInformer、StorageClassInformer资源通过Informer进行监控。
 		cc.InformerFactory,
 		recorderFactory,
 		ctx.Done(),

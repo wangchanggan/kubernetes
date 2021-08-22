@@ -42,17 +42,24 @@ const (
 // This information should be used for observational purposes only and could be replaced
 // with a random string (e.g. UUID) with only slight modification of this code.
 // TODO(mikedanese): this should potentially be versioned
+// key (分布式锁)存在于Etcd 集群的/registry/services/endpoints/kube-system/kube-scheduler中。
+// 该key中存储的是竞选为领导者节点的信息，它通过LeaderElectionRecord结构体进行描述:
 type LeaderElectionRecord struct {
 	// HolderIdentity is the ID that owns the lease. If empty, no one owns this lease and
 	// all callers may acquire. Versions of this library prior to Kubernetes 1.14 will not
 	// attempt to acquire leases with empty identities and will wait for the full lease
 	// interval to expire before attempting to reacquire. This value is set to empty when
 	// a client voluntarily steps down.
-	HolderIdentity       string      `json:"holderIdentity"`
-	LeaseDurationSeconds int         `json:"leaseDurationSeconds"`
-	AcquireTime          metav1.Time `json:"acquireTime"`
-	RenewTime            metav1.Time `json:"renewTime"`
-	LeaderTransitions    int         `json:"leaderTransitions"`
+	// 领导者身份标识，通常为Hostname_<hash 值>.
+	HolderIdentity string `json:"holderIdentity"`
+	// 领导者租约的时长。
+	LeaseDurationSeconds int `json:"leaseDurationSeconds"`
+	// 领导者获得锁的时间。
+	AcquireTime metav1.Time `json:"acquireTime"`
+	// 领导者续租的时间。
+	RenewTime metav1.Time `json:"renewTime"`
+	// 领导者选举切换的次数。
+	LeaderTransitions int `json:"leaderTransitions"`
 }
 
 // EventRecorder records a change in the ResourceLock.
@@ -75,24 +82,31 @@ type ResourceLockConfig struct {
 // to hide the details on specific implementations in order to allow
 // them to change over time.  This interface is strictly for use
 // by the leaderelection code.
+// 每种资源锁实现了对key (资源锁)的操作方法，它的接口定义如下:
 type Interface interface {
 	// Get returns the LeaderElectionRecord
+	// 用于获取资源锁的所有信息
 	Get(ctx context.Context) (*LeaderElectionRecord, []byte, error)
 
 	// Create attempts to create a LeaderElectionRecord
+	// 用于创建资源锁
 	Create(ctx context.Context, ler LeaderElectionRecord) error
 
 	// Update will update and existing LeaderElectionRecord
+	// 用于更新资源锁信息
 	Update(ctx context.Context, ler LeaderElectionRecord) error
 
 	// RecordEvent is used to record events
+	// 通过EventBroadcaster事件管理器记录事件
 	RecordEvent(string)
 
 	// Identity will return the locks Identity
+	// 用于获取领导者身份标识
 	Identity() string
 
 	// Describe is used to convert details on current resource lock
 	// into a string
+	// 用于获取资源锁的信息。
 	Describe() string
 }
 

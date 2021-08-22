@@ -31,6 +31,8 @@ import (
 )
 
 // FitPredicate is a function type which is used in fake extender.
+// 每一个预选调度算法都需要实现FitPredicate的type func, FitPredicate 接收一个待调度Pod资源对象(即pod *v1.Pod) 及一个待选择节点(即node *v1.Node)，
+// 通过预选调度算法计算待选择节点是否符合运行“待调度Pod资源对象”的条件
 type FitPredicate func(pod *v1.Pod, node *v1.Node) *framework.Status
 
 // PriorityFunc is a function type which is used in fake extender.

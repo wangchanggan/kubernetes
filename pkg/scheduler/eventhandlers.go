@@ -355,6 +355,7 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 
 // addAllEventHandlers is a helper function used in tests and in Scheduler
 // to add event handlers for various informers.
+// AddAllEventHandlers 函数为所有Informer 对象添加对资源事件的监控并设置回调函数
 func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
@@ -377,6 +378,8 @@ func addAllEventHandlers(
 					return false
 				}
 			},
+			// podInformer对象监控Pod资源对象，当该资源对象触发Add (添加)、Update (更新)、Delete (删除)事件时，触发对应的回调函数。
+			// 例如，在触发Add事件后，podInformer将其放入SchedulingQueue调度队列中，等待kube-scheduler调度器为该Pod资源对象分配节点。
 			Handler: cache.ResourceEventHandlerFuncs{
 				AddFunc:    sched.addPodToCache,
 				UpdateFunc: sched.updatePodInCache,

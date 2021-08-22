@@ -129,12 +129,15 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
+	// 遍历节点上的所有Pod资源对象，如果发现节点上有Pod 资源对象的优先级小于待调度Pod资源对象并处于终止状态，则返回false, 不会发生抢占，
 	if !PodEligibleToPreemptOthers(pod, nodeLister, m[pod.Status.NominatedNodeName]) {
 		klog.V(5).InfoS("Pod is not eligible for more preemption", "pod", klog.KObj(pod))
 		return "", nil
 	}
 
 	// 2) Find all preemption candidates.
+	// 在预选调度过程中，所有已注册的预选调度算法对节点进行计算
+	// 如果预选调度算法返回false， 则将节点加入预选调度失败的数组(即failedPredicatesMap)并记录预选调度失败的原因。
 	candidates, nodeToStatusMap, status := pl.FindCandidates(ctx, state, pod, m)
 	if !status.IsSuccess() {
 		return "", status
@@ -269,9 +272,11 @@ func PodEligibleToPreemptOthers(pod *v1.Pod, nodeInfos framework.NodeInfoLister,
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
+// nodesWherePreemptionMightHelp 函数做的是从framework.NodeInfo数组中尝试找到能够再次调度成功的节点列表，也称之为潜在的节点列表(potentialNodes)
 func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.NodeToStatusMap) ([]*framework.NodeInfo, framework.NodeToStatusMap) {
 	var potentialNodes []*framework.NodeInfo
 	nodeStatuses := make(framework.NodeToStatusMap)
+	// 遍历framework.NodeInfo数组，如果节点的状态码是UnschedulableAndUnresolvable， 则节点无法加入潜在的节点列表。
 	for _, node := range nodes {
 		name := node.Node().Name
 		// We rely on the status by each plugin - 'Unschedulable' or 'UnschedulableAndUnresolvable'
@@ -323,6 +328,8 @@ func (cl *candidateList) get() []Candidate {
 // returns preemption candidates and a map indicating filtered nodes statuses.
 // The number of candidates depends on the constraints defined in the plugin's args. In the returned list of
 // candidates, ones that do not violate PDB are preferred over ones that do.
+// dryRunPreemption函数并发地计算所有潜在节点中可能被抢占的节点。
+// 通过selectVictimsOnNode函数遍历节点上所有的Pod资源对象，并筛选出优先级低于当前待调度Pod资源对象的Pod资源对象作为被驱逐的对象。
 func dryRunPreemption(ctx context.Context, fh framework.Handle,
 	state *framework.CycleState, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) ([]Candidate, framework.NodeToStatusMap) {
@@ -460,6 +467,11 @@ func SelectCandidate(candidates []Candidate) Candidate {
 // 6. If there are still ties, the first such node is picked (sort of randomly).
 // The 'minNodes1' and 'minNodes2' are being reused here to save the memory
 // allocation and garbage collection time.
+// (1) PDB中断次数最少的节点。PDB (PodDisrupionBudget) 能够限制同时中断的Pod资源对象的数量，以保证集群的高可用性。
+// (2) 具有最少高优先级Pod资源对象的节点。
+// (3) 具有优先级Pod资源对象总数最少的节点。
+// (4) 具有被驱逐Pod资源对象总数最少的节点。
+// (5) 最后，多个节点具有相同的分数，直接返回第一个节点。
 func pickOneNodeForPreemption(nodesToVictims map[string]*extenderv1.Victims) string {
 	if len(nodesToVictims) == 0 {
 		return ""
@@ -727,6 +739,8 @@ func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface,
 // manipulation of NodeInfo and PreFilter state per nominated pod. It may not be
 // worth the complexity, especially because we generally expect to have a very
 // small number of nominated pods per node.
+// getLowerPriorityNominatedPods函数从调度队列中获取被抢占节点上所有优先级低于待调度Pod资源对象的NominatedPods列表。
+// 在驱逐被抢占节点上的Pod资源对象列表后，还需要清除被抢占Pod资源对象的NominatedPods
 func getLowerPriorityNominatedPods(pn framework.PodNominator, pod *v1.Pod, nodeName string) []*v1.Pod {
 	podInfos := pn.NominatedPodsForNode(nodeName)
 

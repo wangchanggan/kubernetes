@@ -199,12 +199,15 @@ func (le *LeaderElector) Run(ctx context.Context) {
 		le.config.Callbacks.OnStoppedLeading()
 	}()
 
+	// le.acquire函数尝试从Etcd中获取资源锁
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// 领导者节点获取到资源锁后会执行kube-scheduler的主要逻辑(即le.config.Callbacks.OnStartedLeading回调函数)
 	go le.config.Callbacks.OnStartedLeading(ctx)
+	// 通过le.renew函数定时(默认值为2秒)对资源锁续约。候选节点获取不到资源锁，它不会退出并定时(默认值为2秒)尝试获取资源锁，直到成功为止。
 	le.renew(ctx)
 }
 
@@ -241,7 +244,12 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	succeeded := false
 	desc := le.config.Lock.Describe()
 	klog.Infof("attempting to acquire leader lease %v...", desc)
+	// 获取资源锁的过程通过wait.JitterUntil 定时器定时执行，它接收一个func匿名函数和一个stopCh Chan
+	// 内部会定时调用匿名函数，只有当stopCh 关闭时，该定时器才会停止并退出。
 	wait.JitterUntil(func() {
+		// 执行le.tryAcquireOrRenew函数来获取资源锁。
+		// 如果其获取资源锁失败，会通过return等待下次定时获取资源锁。
+		// 如果其获取资源锁成功，则说明当前节点可以成为领导者节点，退出acquire函数并返回true
 		succeeded = le.tryAcquireOrRenew(ctx)
 		le.maybeReportTransition()
 		if !succeeded {
@@ -257,13 +265,20 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 }
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails or ctx signals done.
+// 在领导者节点获取资源锁以后，会定时(默认值为2秒)循环更新租约信息，以保持长久的领导者身份。
+// 若因网络超时而导致租约信息更新失败，则说明被候选节点抢占了领导者身份，当前节点会退出进程。
 func (le *LeaderElector) renew(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wait.Until(func() {
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
 		defer timeoutCancel()
+		// 领导者节点续约的过程通过wwait.PollImmediateUntil定时器定时执行，它接收一个func匿名函数(条件函数)和一个stopCh
+		// 内部会定时调用条件函数，当条件函数返回true或stopCh关闭时，该定时器才会停止并退出。
 		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) {
+			// 执行le.tryAcquireOrRenew函数来实现领导者节点的续约，其原理与资源锁获取过程相同
+			// le.tryAcquireOrRenew函数返回true说明续约成功，并进入下一个定时续约
+			// 返回false 则退出并执行le.release函数且释放资源锁。
 			return le.tryAcquireOrRenew(timeoutCtx), nil
 		}, timeoutCtx.Done())
 
@@ -319,6 +334,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	}
 
 	// 1. obtain or create the ElectionRecord
+	// 通过le.config.Lock.Get 函数获取资源锁，当资源锁不存在时，当前节点创建该key (获取锁)并写入自身节点的信息，创建成功则当前节点成为领导者节点并返回true
 	oldLeaderElectionRecord, oldLeaderElectionRawRecord, err := le.config.Lock.Get(ctx)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -335,11 +351,14 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	}
 
 	// 2. Record obtained, check the Identity & Time
+	// 当资源锁存在时，更新本地缓存的租约信息。
 	if !bytes.Equal(le.observedRawRecord, oldLeaderElectionRawRecord) {
 		le.observedRecord = *oldLeaderElectionRecord
 		le.observedRawRecord = oldLeaderElectionRawRecord
 		le.observedTime = le.clock.Now()
 	}
+
+	// 候选节点会验证领导者节点的租约是否到期，如果尚未到期，暂时还不能抢占并运回false.
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
 		le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
 		!le.IsLeader() {
@@ -349,6 +368,8 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 
 	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
 	// here. Let's correct it before updating.
+	// 如果是领导者节点，那么AcquireTime( 资源锁获得时间)和LeaderTranitions(领导者进行切换的次数)字段保持不变。
+	// 如果是候选节点，则说明领导者节点的租约到期，给LeaderTransitions字段加1并抢占资源锁。
 	if le.IsLeader() {
 		leaderElectionRecord.AcquireTime = oldLeaderElectionRecord.AcquireTime
 		leaderElectionRecord.LeaderTransitions = oldLeaderElectionRecord.LeaderTransitions
@@ -357,6 +378,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	}
 
 	// update the lock itself
+	// 通过le.config.Lock.Update函数尝试去更新租约记录，若更新成功，函数返回true
 	if err = le.config.Lock.Update(ctx, leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to update lock: %v", err)
 		return false

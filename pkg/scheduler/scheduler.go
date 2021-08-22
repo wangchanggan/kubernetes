@@ -313,6 +313,8 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
 	sched.SchedulingQueue.Run()
+	// sched.scheduleOne 是kube-scheduler组件的调度主逻辑，它通过waitUntil 定时器执行，内部会定时调用sched.scheduleOne函数
+	// 当sched.StopEverything Chan关闭时，该定时器才会停止并退出。
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 	sched.SchedulingQueue.Close()
 }
@@ -392,6 +394,9 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 // bind binds a pod to a given node defined in a binding object.
 // The precedence for binding is: (1) extenders and (2) framework plugins.
 // We expect this to run asynchronously, so we handle binding metrics internally.
+// bind (绑定)操作是将通过调度算法计算出来的最佳节点与Pod资源对象进行绑定，该过程是异步操作，无须等待bind 操作完成即可进入下一轮的调度周期。
+// 由kube-scheduler调度器通过ClientSet向Kubernetes API Server发送v1.Binding资源对象，如果绑定失败，则执行回滚操作;
+// 如果绑定成功，则当前调度周期完成，后面运行Pod资源对象的工作交给绑定节点上的kubelet组件。
 func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state *framework.CycleState) (err error) {
 	defer func() {
 		sched.finishBinding(fwk, assumed, targetNode, err)

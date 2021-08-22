@@ -90,6 +90,123 @@ Source Code From https://github.com/kubernetes/kubernetes/releases/tag/v1.21.0
             -   [常驻进程实现](#常驻进程实现)
             -   [进程的优雅关闭](#进程的优雅关闭)
             -   [向systemd报告进程状态](#向systemd报告进程状态)
+    -   [kube-scheduler核心实现](#kube-scheduler核心实现)
+        -   [内置调度算法的注册](#内置调度算法的注册)
+        -   [实例化Scheduler对象](#实例化scheduler对象)
+            -   [运行EventBroadcaster事件管理器](#运行eventbroadcaster事件管理器)
+            -   [运行HTTP或HTTPS服务](#运行http或https服务)
+            -   [运行Informer同步资源](#运行informer同步资源)
+            -   [领导者选举实例化](#领导者选举实例化)
+            -   [运行sched.Run调度器](#运行sched.run调度器)
+        -   [亲和性调度](#亲和性调度)
+            -   [NodeAffinity](#nodeaffinity)
+            -   [PodAffinity](#podaffinity)
+            -   [PodAntiAffinity](#podantiaffinity)
+        -   [内置调度算法](#内置调度算法)
+            -   [预选调度算法](#预选调度算法)
+            -   [优选调度算法](#优选调度算法)
+        -   [调度器核心实现](#调度器核心实现)
+            -   [调度过程](#调度过程)
+            -   [Preempt抢占机制](#preempt抢占机制)
+            -   [bind绑定机制](#bind绑定机制)
+        -   [领导者选举机制](#领导者选举机制)
+            -   [资源锁](#资源锁)
+            -   [领导者选举过程](#领导者选举过程)
+
+# Kubernetes源码分析
+
+Source Code From
+https://github.com/kubernetes/kubernetes/releases/tag/v1.21.0
+
+参考Kubernetes源码分析（基于Kubernetes 1.14版本）（郑东旭/著）
+
+## 目录
+
+-   [Kubernetes源码分析](#kubernetes源码分析)
+    -   [目录](#目录)
+    -   [源码目录结构说明](#源码目录结构说明)
+    -   [架构](#架构)
+    -   [核心数据结构](#核心数据结构)
+        -   [APIResourceList](#apiresourcelist)
+        -   [Group](#group)
+        -   [Version](#version)
+        -   [Resource](#resource)
+            -   [资源外部版本与内部版本](#资源外部版本与内部版本)
+            -   [资源代码定义](#资源代码定义)
+            -   [资源注册到资源注册表](#资源注册到资源注册表)
+            -   [资源首选版本](#资源首选版本)
+            -   [资源操作方法](#资源操作方法)
+            -   [资源与命名空间](#资源与命名空间)
+        -   [runtime.Object类型基石](#runtime.object类型基石)
+        -   [Unstructured数据](#unstructured数据)
+        -   [Scheme资源注册表](#scheme资源注册表)
+            -   [Scheme资源注册表数据结构](#scheme资源注册表数据结构)
+            -   [资源注册表注册方法](#资源注册表注册方法)
+        -   [Codec编解码器](#codec编解码器)
+            -   [Codec编解码实例化](#codec编解码实例化)
+            -   [jsonSerializer与yamlSerializer序列化器](#jsonserializer与yamlserializer序列化器)
+            -   [protobufSerializer序列号器](#protobufserializer序列号器)
+        -   [Converter资源版本转换器](#converter资源版本转换器)
+            -   [Converter转换器数据结构](#converter转换器数据结构)
+            -   [Converter注册转换函数](#converter注册转换函数)
+            -   [Converter资源版本转换原理](#converter资源版本转换原理)
+    -   [kubectl命令行交互](#kubectl命令行交互)
+        -   [创建资源对象的过程](#创建资源对象的过程)
+            -   [实例化Factory接口](#实例化factory接口)
+            -   [Builder构建资源对象](#builder构建资源对象)
+            -   [Visitor多层匿名函数嵌套](#visitor多层匿名函数嵌套)
+    -   [client-go编程式交互](#client-go编程式交互)
+    -   [Etcd存储核心实现](#etcd存储核心实现)
+        -   [RegistryStore存储服务通用操作](#registrystore存储服务通用操作)
+        -   [Storage.Interface通用存储接口](#storage.interface通用存储接口)
+        -   [CacherStorage缓存层](#cacherstorage缓存层)
+            -   [CacherStorage缓存层设计](#cacherstorage缓存层设计)
+            -   [watchCache 缓存滑动窗口](#watchcache-缓存滑动窗口)
+        -   [UnderlyingStorage底层存储对象](#underlyingstorage底层存储对象)
+        -   [Codec编解码数据](#codec编解码数据)
+        -   [Strategy预处理](#strategy预处理)
+            -   [创建资源对象时的预处理操作](#创建资源对象时的预处理操作)
+            -   [更新资源对象时的预处理操作](#更新资源对象时的预处理操作)
+            -   [删除资源对象时的预处理操作](#删除资源对象时的预处理操作)
+    -   [kube-apiserver核心实现](#kube-apiserver核心实现)
+        -   [热身概念](#热身概念)
+            -   [go-restful核心原理](#go-restful核心原理)
+            -   [OpenAPI/Swagger核心原理](#openapiswagger核心原理)
+            -   [gRPC核心原理](#grpc核心原理)
+        -   [kube-apiserver启动流程](#kube-apiserver启动流程)
+            -   [资源注册](#资源注册)
+            -   [Cobra命令行参数解析](#cobra命令行参数解析)
+            -   [创建APIServer通用配置](#创建apiserver通用配置)
+            -   [创建APIExtensionsServer](#创建apiextensionsserver)
+            -   [创建KubeAPIServer](#创建kubeapiserver)
+            -   [创建AggregatorServer](#创建aggregatorserver)
+            -   [创建GenericAPIServer（以创建APIExtensionsSever为例）](#创建genericapiserver以创建apiextensionssever为例)
+            -   [启动HTTP服务](#启动http服务)
+            -   [启动HTTPS服务](#启动https服务)
+        -   [认证](#认证)
+            -   [BasicAuth认证](#basicauth认证)
+            -   [ClientCA认证](#clientca认证)
+            -   [TokenAuth认证](#tokenauth认证)
+            -   [BootstrapToken认证](#bootstraptoken认证)
+            -   [RequestHeader认证](#requestheader认证)
+            -   [Webhook TokenAuth认证](#webhook-tokenauth认证)
+            -   [Anonymous认证](#anonymous认证)
+            -   [OIDC认证](#oidc认证)
+            -   [ServiceAccountAuth认证](#serviceaccountauth认证)
+        -   [授权](#授权)
+            -   [AlwaysAllow授权](#alwaysallow授权)
+            -   [AlwaysDeny授权](#alwaysdeny授权)
+            -   [ABAC授权](#abac授权)
+            -   [Webhook授权](#webhook授权)
+            -   [RBAC授权](#rbac授权)
+            -   [Node授权](#node授权)
+        -   [准入控制器](#准入控制器)
+            -   [AlwaysPullImages准入控制器](#alwayspullimages准入控制器)
+            -   [PodNodeSelector准入控制器](#podnodeselector准入控制器)
+        -   [进程信号处理机制](#进程信号处理机制)
+            -   [常驻进程实现](#常驻进程实现)
+            -   [进程的优雅关闭](#进程的优雅关闭)
+            -   [向systemd报告进程状态](#向systemd报告进程状态)
 
 ## 源码目录结构说明
 | 源码目录 | 说明 | 备注 |
@@ -589,4 +706,123 @@ vendor/k8s.io/apiserver/pkg/server/genericapiserver.go:334
 
 #### 向systemd报告进程状态
 vendor/k8s.io/apiserver/pkg/server/genericapiserver.go:422
+
+## kube-scheduler核心实现
+见docs/kube-scheduler核心实现.doc
+### kube-scheduler组件的启动流程
+#### Cobra命令行参数解析
+cmd/kube-scheduler/app/server.go:64
+
+#### 内置调度算法的注册
+pkg/scheduler/factory.go:193
+
+### 实例化Scheduler对象
+1.实例化所有的Informer cmd/kube-scheduler/app/server.go:318
+2.实例化调度算法函数 pkg/scheduler/apis/config/types.go:135
+3.为所有Informer对象添加对资源事件的监控 pkg/scheduler/eventhandlers.go:359
+
+#### 运行EventBroadcaster事件管理器
+cmd/kube-scheduler/app/server.go:159
+
+#### 运行HTTP或HTTPS服务
+kube-scheduler组件也拥有自己的HTTP服务，但功能仅限于监控及监控检查等，其运行原理与kube-apiserver组件的类似。
+
+/healthz：用于健康检查。
+
+/metries：用于监控指标，一般用于Prometheus指标采集。
+
+/debug/pprof：用于pprof性能分析。
+
+#### 运行Informer同步资源
+cmd/kube-scheduler/app/server.go:208
+
+#### 领导者选举实例化
+cmd/kube-scheduler/app/server.go:211
+
+#### 运行sched.Run调度器
+pkg/scheduler/scheduler.go:314
+
+
+### 亲和性调度
+vendor/k8s.io/api/core/v1/types.go:2688
+
+#### NodeAffinity
+vendor/k8s.io/api/core/v1/types.go:2825
+
+#### PodAffinity
+vendor/k8s.io/api/core/v1/types.go:2707
+
+#### PodAntiAffinity
+vendor/k8s.io/api/core/v1/types.go:2747
+
+
+### 内置调度算法
+#### 预选调度算法
+pkg/scheduler/testing/fake_extender.go:36
+
+#### 优选调度算法
+pkg/scheduler/framework/extender.go:41
+
+
+### 调度器核心实现
+#### 调度过程
+1.预选调度前的性能优化 pkg/scheduler/core/generic_scheduler.go:190
+
+2.预选调度过程
+
+pkg/scheduler/core/generic_scheduler.go:285
+
+pkg/scheduler/framework/runtime/framework.go:651
+
+3.优选调度过程
+
+pkg/scheduler/core/generic_scheduler.go:425
+
+以 leastRequestedPriority 优选调度算法为例 pkg/scheduler/framework/plugins/noderesources/least_allocated.go:97
+
+4.选择一个最佳节点 pkg/scheduler/core/generic_scheduler.go:156
+
+#### Preempt抢占机制
+1.判断当前Pod资源对象是否有资格抢占其他Pod资源对象所在的节点 
+
+pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go:133
+
+2.从预选调度失败的节点中尝试找到能够调度成功的节点列表(潜在的节点列表)
+
+pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go:141,276
+
+3.从潜在的节点列表中尝试找到能够抢占成功的节点列表(驱逐的节点列表)
+
+pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go:333
+
+4.从驱逐的节点列表中选择一个节点用于最终被抢占的节点(被抢占节点)
+
+pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go:475
+
+5.获取被抢占节点上的所有NominatedPods列表
+
+pkg/scheduler/framework/plugins/defaultpreemption/default_preemption.go:744
+
+#### bind绑定机制
+pkg/scheduler/scheduler.go:400
+
+
+### 领导者选举机制
+#### 资源锁
+vendor/k8s.io/client-go/tools/leaderelection/resourcelock/interface.go:47,86
+
+#### 领导者选举过程
+vendor/k8s.io/client-go/tools/leaderelection/leaderelection.go:196
+
+1.资源锁获取过程
+
+vendor/k8s.io/client-go/tools/leaderelection/leaderelection.go:241,327
+
+2.领导者节点定时更新租约过程
+
+vendor/k8s.io/client-go/tools/leaderelection/leaderelection.go:270
+
+
+
+
 

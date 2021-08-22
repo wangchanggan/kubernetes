@@ -647,6 +647,7 @@ func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.Po
 // and add the nominated pods. Removal of the victims is done by
 // SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
 // NodeInfo before calling this function.
+// 用于运行所有预选调度算法来对节点进行计算。在某种情况下，所有的预选调度算法都会执行两遍
 func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, state *framework.CycleState, pod *v1.Pod, info *framework.NodeInfo) *framework.Status {
 	var status *framework.Status
 
@@ -669,11 +670,17 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	// the nominated pods are treated as not running. We can't just assume the
 	// nominated pods are running because they are not running right now and in fact,
 	// they may end up getting scheduled to a different node.
+	// 在正常的情况下，kube-scheduler 调度器只运行一次所有预选调度算法对节点进行计算的过程，但在一种情况下需要计算两次，这跟Pod资源对象亲和性有关。
 	for i := 0; i < 2; i++ {
 		stateToUse := state
 		nodeInfoToUse := info
 		if i == 0 {
 			var err error
+			// addNominatedPods 函数从调度队列中找到节点上优先级大于或等于当前Pod资源对象的NominatedPods，
+			// 如果节点上存在NominatedPods，则将当前Pod资源对象和NominatedPods加入相同的nodeInfo对象中。
+			// 其中，NominatedPods表示已经分配到节点上但还没有真正运行起来的Pod资源对象，它们在其他Pod资源对象从节点中被删除后才可以进行实际调度。
+			// 假设当前调度Pod资源对象的亲和性策略依赖的是NominatedPods，NominatedPods不能保证一定可以调度到对应的节点上。
+			// 例如，在抢占机制中，NominatedPods有可能被从调度队列中清理。
 			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, f, pod, state, info)
 			if err != nil {
 				return framework.AsStatus(err)
@@ -682,6 +689,7 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 			break
 		}
 
+		// 遍历所有的预选调度算法，预选调度算法默认是经过排序的，执行时会按照顺序执行。执行已注册的预选调度算法对节点进行计算。
 		statusMap := f.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
 		status = statusMap.Merge()
 		if !status.IsSuccess() && !status.IsUnschedulable() {
